@@ -1,0 +1,14 @@
+{
+  "name": "Tracker de Medios — Maeva",
+  "short_name": "Tracker Maeva",
+  "description": "Registro diario de canales de contacto para agentes de reservas",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0D2D3F",
+  "theme_color": "#C4572E",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
