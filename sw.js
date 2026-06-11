@@ -1,8 +1,9 @@
-const CACHE = 'tracker-maeva-v1';
+const CACHE = 'tracker-maeva-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './icon.svg',
   './icon-192.png',
   './icon-512.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',

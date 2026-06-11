@@ -522,10 +522,12 @@ function generarFavicon() {
   canvas.width = 64; canvas.height = 64;
   const ctx = canvas.getContext('2d');
   // Fondo naranja malva (terracota)
-  ctx.fillStyle = '#C4572E';
+  // Recortar al rect redondeado — las esquinas se cortan, no quedan transparentes
   ctx.beginPath();
-  ctx.roundRect(0, 0, 64, 64, 14);
-  ctx.fill();
+  ctx.roundRect(0, 0, 64, 64, 12);
+  ctx.clip();
+  ctx.fillStyle = '#C4572E';
+  ctx.fillRect(0, 0, 64, 64);
   // Logo centrado con padding
   ctx.drawImage(img, 6, 6, 52, 52);
   const favicon = document.getElementById('app-favicon');
