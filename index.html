@@ -124,7 +124,7 @@ body.dark .td-res .c-val{color:#4ade80}
 .banner-ok.show{display:flex}
 
 /* ── Dashboard KPIs ── */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
 .kpi-card{background:var(--blanco);border:1px solid rgba(0,174,239,.13);border-radius:14px;padding:1rem 1.1rem;box-shadow:0 1px 3px rgba(0,0,0,.04);border-top:3px solid var(--azul)}
 .kpi-card.verde{border-top-color:var(--verde)}
 .kpi-card.dorado{border-top-color:var(--dorado)}
@@ -169,6 +169,12 @@ code{font-family:'Courier New',monospace;background:var(--azul-light);color:var(
 .badge-azul{background:var(--azul-light);color:var(--azul-dark)}
 .badge-verde{background:var(--verde-light);color:var(--verde-dark)}
 .badge-gris{background:#F0F4F8;color:#64748B}
+.badge-delta-pos{background:#DCFCE7;color:#16A34A}
+.badge-delta-neg{background:#FEE2E2;color:#DC2626}
+.insight-card{background:linear-gradient(135deg,rgba(0,174,239,.06),rgba(245,166,35,.06));border:1px solid rgba(0,174,239,.18);border-radius:14px;padding:1rem 1.2rem;margin-bottom:14px}
+.insight-card .insight-title{font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.insight-card ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:7px}
+.insight-card li{font-size:12.5px;color:var(--texto);line-height:1.5}
 
 /* ── Toast ── */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#0D2D3F;color:#fff;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;transition:transform .3s,opacity .3s;opacity:0;box-shadow:0 8px 32px rgba(0,0,0,.25);white-space:nowrap}
@@ -207,6 +213,10 @@ body.dark .chip{background:#252525;border-color:#4dd4ff;color:#4dd4ff}
 body.dark .chip.active{background:#4dd4ff;color:#0a1a24}
 body.dark code{background:#0d1f2d;color:#4dd4ff}
 body.dark .badge-gris{background:#252525;color:#a8cfe0}
+body.dark .badge-delta-pos{background:rgba(74,222,128,.15);color:#4ade80}
+body.dark .badge-delta-neg{background:rgba(239,68,68,.15);color:#f87171}
+body.dark .insight-card{background:linear-gradient(135deg,rgba(77,212,255,.05),rgba(245,166,35,.05));border-color:#2d2d2d}
+body.dark .insight-card li{color:#e8f4fb}
 body.dark .total-card.azul{background:#0d1f2d}
 body.dark .total-card.verde{background:#052e16}
 body.dark .total-card.dorado{background:#2a1a00}
@@ -357,23 +367,33 @@ body.dark .ag-table td{border-color:#2d2d2d}
       <div class="kpi-card">
         <div class="kpi-label">Cotizaciones</div>
         <div class="kpi-val" id="kpi-cot">—</div>
-        <div class="kpi-sub" id="kpi-cot-sub">en el periodo</div>
+        <div class="kpi-sub">en el periodo <span id="kpi-delta-cot"></span></div>
       </div>
       <div class="kpi-card verde">
         <div class="kpi-label">Reservaciones</div>
         <div class="kpi-val" id="kpi-res">—</div>
-        <div class="kpi-sub">en el periodo</div>
+        <div class="kpi-sub">en el periodo <span id="kpi-delta-res"></span></div>
       </div>
       <div class="kpi-card dorado">
         <div class="kpi-label">Conversión</div>
         <div class="kpi-val" id="kpi-conv">—</div>
-        <div class="kpi-sub">reservaciones / cotizaciones</div>
+        <div class="kpi-sub">res / cot <span id="kpi-delta-conv"></span></div>
       </div>
       <div class="kpi-card gris">
-        <div class="kpi-label">Canal #1</div>
+        <div class="kpi-label">Canal #1 (volumen)</div>
         <div class="kpi-val" id="kpi-top" style="font-size:15px;margin-top:8px;line-height:1.3">—</div>
         <div class="kpi-sub" id="kpi-top-sub">por cotizaciones</div>
       </div>
+      <div class="kpi-card verde">
+        <div class="kpi-label">Canal eficiente</div>
+        <div class="kpi-val" id="kpi-eficiente" style="font-size:15px;margin-top:8px;line-height:1.3">—</div>
+        <div class="kpi-sub" id="kpi-eficiente-sub">por conversión</div>
+      </div>
+    </div>
+
+    <div class="insight-card" id="insight-card" style="display:none">
+      <div class="insight-title">💡 Insights del periodo</div>
+      <ul id="insight-list"></ul>
     </div>
 
     <div class="card">
@@ -384,6 +404,11 @@ body.dark .ag-table td{border-color:#2d2d2d}
     <div class="card">
       <div class="sec">Tendencia diaria</div>
       <div class="chart-box h300"><canvas id="chart-tend"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="sec">Volumen promedio por día de la semana</div>
+      <div class="chart-box" style="height:220px"><canvas id="chart-diasem"></canvas></div>
     </div>
 
     <div class="card">
@@ -481,6 +506,7 @@ let rango = 'hoy';
 let datos = [];
 let chartCanales = null;
 let chartTend = null;
+let chartDiaSem = null;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 
@@ -749,9 +775,202 @@ function renderDashboard() {
   document.getElementById('kpi-top').textContent     = topM ? topM.label : '—';
   document.getElementById('kpi-top-sub').textContent = `${topV} cotizaciones`;
 
+  // ICC — Canal más eficiente (mínimo 3 cotizaciones para evitar falsos positivos)
+  let efId = null, efConv = 0;
+  MEDIOS.forEach(m => {
+    if (porMedio[m.id].cot >= 3) {
+      const cv = porMedio[m.id].res / porMedio[m.id].cot;
+      if (cv > efConv) { efConv = cv; efId = m.id; }
+    }
+  });
+  const efM = MEDIOS.find(m => m.id === efId);
+  document.getElementById('kpi-eficiente').textContent    = efM ? efM.label : '—';
+  document.getElementById('kpi-eficiente-sub').textContent = efM ? Math.round(efConv*100)+'% conversión' : 'min. 3 cotizaciones';
+
+  // Deltas vs periodo anterior
+  const filasAnt = filtrarPeriodoAnterior();
+  const { tc: tcA, tr: trA } = filasAnt.length ? calcTotales(filasAnt) : { tc: 0, tr: 0 };
+  renderDelta('kpi-delta-cot', tc, tcA);
+  renderDelta('kpi-delta-res', tr, trA);
+  const convAct = tc > 0 ? Math.round((tr/tc)*100) : null;
+  const convAnt = tcA > 0 ? Math.round((trA/tcA)*100) : null;
+  if (convAct !== null && convAnt !== null) renderDelta('kpi-delta-conv', convAct, convAnt);
+  else document.getElementById('kpi-delta-conv').innerHTML = '';
+
+  // Insights automáticos
+  const ins = generarInsights(filas, porMedio, tc, tr, filasAnt);
+  const insCard = document.getElementById('insight-card');
+  if (ins.length) {
+    document.getElementById('insight-list').innerHTML = ins.map(i => `<li>${i}</li>`).join('');
+    insCard.style.display = '';
+  } else {
+    insCard.style.display = 'none';
+  }
+
   dibujarCanales(porMedio);
   dibujarTendencia(filas);
+  dibujarDiaSemana(filas);
   dibujarTablaAgentes(filas);
+}
+
+function filtrarPeriodoAnterior() {
+  const hoy = new Date();
+  const hoyS = fechaStr(hoy);
+  const agF = document.getElementById('sel-agente').value;
+  let desdeS, hastaS;
+
+  if (rango === 'hoy') {
+    const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+    desdeS = hastaS = fechaStr(ayer);
+  } else if (rango === 'semana') {
+    const d1 = new Date(hoy); d1.setDate(d1.getDate() - 13);
+    const d2 = new Date(hoy); d2.setDate(d2.getDate() - 7);
+    desdeS = fechaStr(d1); hastaS = fechaStr(d2);
+  } else if (rango === 'mes') {
+    const d1 = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const d2 = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    desdeS = fechaStr(d1); hastaS = fechaStr(d2);
+  } else if (rango === 'dia') {
+    const diaVal = document.getElementById('inp-dia-dash').value || hoyS;
+    const d = new Date(diaVal + 'T12:00:00'); d.setDate(d.getDate() - 1);
+    desdeS = hastaS = fechaStr(d);
+  } else {
+    return [];
+  }
+
+  return datos.filter(r => {
+    const f = String(r.fecha).substring(0, 10);
+    return f >= desdeS && f <= hastaS && (!agF || r.agente === agF);
+  });
+}
+
+function calcTotales(filas) {
+  let tc = 0, tr = 0;
+  filas.forEach(r => MEDIOS.forEach(m => {
+    tc += +(r[`cot_${m.id}`] || 0);
+    tr += +(r[`res_${m.id}`] || 0);
+  }));
+  return { tc, tr };
+}
+
+function renderDelta(id, actual, anterior) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!anterior || anterior === 0) { el.innerHTML = ''; return; }
+  const pct = Math.round(((actual - anterior) / anterior) * 100);
+  const cls = pct >= 0 ? 'badge-delta-pos' : 'badge-delta-neg';
+  const arrow = pct >= 0 ? '↑' : '↓';
+  el.innerHTML = `<span class="badge ${cls}" style="margin-left:4px;font-size:10px">${arrow}${Math.abs(pct)}%</span>`;
+}
+
+function generarInsights(filas, porMedio, tc, tr, filasAnt) {
+  const ins = [];
+  if (filas.length < 2 || tc < 5) return ins;
+  const convGral = tc > 0 ? tr / tc : 0;
+
+  // Canal más eficiente vs promedio general
+  let mejorId = null, mejorConv = 0;
+  MEDIOS.forEach(m => {
+    if (porMedio[m.id].cot >= 3) {
+      const cv = porMedio[m.id].res / porMedio[m.id].cot;
+      if (cv > mejorConv) { mejorConv = cv; mejorId = m.id; }
+    }
+  });
+  if (mejorId && convGral > 0 && mejorConv > convGral * 1.3) {
+    const label = MEDIOS.find(m => m.id === mejorId).label;
+    const mult = (mejorConv / convGral).toFixed(1);
+    ins.push(`📊 <strong>${label}</strong> convierte ${mult}× mejor que el promedio del hotel (${Math.round(mejorConv*100)}% vs ${Math.round(convGral*100)}%)`);
+  }
+
+  // Canal de alto volumen, baja conversión
+  let peorId = null, peorConv = Infinity;
+  MEDIOS.forEach(m => {
+    const cot = porMedio[m.id].cot;
+    if (cot >= 5 && cot / tc >= 0.15) {
+      const cv = porMedio[m.id].res / cot;
+      if (cv < convGral * 0.6 && cv < peorConv) { peorConv = cv; peorId = m.id; }
+    }
+  });
+  if (peorId) {
+    const label = MEDIOS.find(m => m.id === peorId).label;
+    const pctVol = Math.round(porMedio[peorId].cot / tc * 100);
+    ins.push(`⚠️ <strong>${label}</strong> genera el ${pctVol}% del volumen pero solo ${Math.round(peorConv*100)}% de conversión — revisar seguimiento`);
+  }
+
+  // Delta temporal
+  if (filasAnt && filasAnt.length > 0) {
+    const { tc: tcA } = calcTotales(filasAnt);
+    if (tcA > 0) {
+      const delta = Math.round(((tc - tcA) / tcA) * 100);
+      const signo = delta >= 0 ? '+' : '';
+      const emoj = delta >= 0 ? '📈' : '📉';
+      const periodo = rango === 'hoy' ? 'ayer' : rango === 'semana' ? 'la semana pasada' : rango === 'mes' ? 'el mes pasado' : 'el día anterior';
+      ins.push(`${emoj} ${signo}${delta}% de cotizaciones comparado con ${periodo}`);
+    }
+  }
+
+  // Agente destaque (solo si hay más de uno)
+  const porAgente = {};
+  filas.forEach(r => {
+    if (!porAgente[r.agente]) porAgente[r.agente] = { cot: 0, res: 0 };
+    MEDIOS.forEach(m => {
+      porAgente[r.agente].cot += +(r[`cot_${m.id}`] || 0);
+      porAgente[r.agente].res += +(r[`res_${m.id}`] || 0);
+    });
+  });
+  const agentes = Object.keys(porAgente);
+  if (agentes.length > 1) {
+    let mejorAg = null, mejorAgConv = 0;
+    agentes.forEach(ag => {
+      if (porAgente[ag].cot >= 5) {
+        const cv = porAgente[ag].res / porAgente[ag].cot;
+        if (cv > mejorAgConv) { mejorAgConv = cv; mejorAg = ag; }
+      }
+    });
+    if (mejorAg && convGral > 0 && mejorAgConv > convGral * 1.5) {
+      const mult = (mejorAgConv / convGral).toFixed(1);
+      ins.push(`🏆 <strong>${mejorAg}</strong> convierte ${mult}× mejor que el equipo (${Math.round(mejorAgConv*100)}% vs ${Math.round(convGral*100)}%)`);
+    }
+  }
+
+  return ins;
+}
+
+function dibujarDiaSemana(filas) {
+  const dias  = [0,0,0,0,0,0,0];
+  const diasR = [0,0,0,0,0,0,0];
+  const diasN = [0,0,0,0,0,0,0];
+  filas.forEach(r => {
+    const fk = String(r.fecha).substring(0, 10);
+    const d  = new Date(fk + 'T12:00:00').getDay();
+    let tc = 0, tr = 0;
+    MEDIOS.forEach(m => { tc += +(r[`cot_${m.id}`]||0); tr += +(r[`res_${m.id}`]||0); });
+    dias[d] += tc; diasR[d] += tr; diasN[d]++;
+  });
+  const order  = [1,2,3,4,5,6,0];
+  const labels = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const dataCot = order.map(i => diasN[i] > 0 ? +(dias[i]/diasN[i]).toFixed(1) : 0);
+  const dataRes = order.map(i => diasN[i] > 0 ? +(diasR[i]/diasN[i]).toFixed(1) : 0);
+  const c = colores();
+  if (chartDiaSem) chartDiaSem.destroy();
+  chartDiaSem = new Chart(document.getElementById('chart-diasem'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {label:'Cot. promedio', data:dataCot, backgroundColor:c.cot, borderRadius:5, borderSkipped:false},
+        {label:'Res. promedio', data:dataRes, backgroundColor:c.res, borderRadius:5, borderSkipped:false}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:c.text,font:{family:'Inter',size:12}}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:c.textB,font:{family:'Inter',weight:'600'}}},
+        y:{grid:{color:c.grid},ticks:{color:c.text,font:{family:'Inter'},stepSize:1},beginAtZero:true}
+      }
+    }
+  });
 }
 
 function colores() {
