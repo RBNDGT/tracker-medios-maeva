@@ -311,6 +311,20 @@ body.dark .ag-table td{border-color:#2d2d2d}
       </div>
     </div>
 
+    <div class="card card-accent">
+      <div class="sec">Llamadas realizadas hoy</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:20px;padding:16px 0 8px">
+        <button onclick="ajustarLlamada(-1)"
+          style="width:48px;height:48px;border-radius:50%;border:2px solid var(--gris-borde);background:var(--blanco);font-size:24px;cursor:pointer;color:var(--texto-suave);font-family:inherit;transition:.15s"
+          onmouseover="this.style.background='var(--gris-bg)'" onmouseout="this.style.background='var(--blanco)'">−</button>
+        <div id="llamadas-num" style="font-size:60px;font-weight:800;color:var(--texto);letter-spacing:-.03em;min-width:80px;text-align:center;line-height:1">0</div>
+        <button onclick="ajustarLlamada(1)"
+          style="padding:13px 26px;border-radius:12px;border:none;background:var(--azul);color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s"
+          onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">+ Llamada</button>
+      </div>
+      <div style="font-size:11px;text-align:center;color:var(--texto-suave);padding-bottom:4px">Se incluye automáticamente al enviar el registro del día</div>
+    </div>
+
     <div class="card">
       <div class="sec">Registro por medio</div>
       <div class="tracker-wrap">
@@ -509,6 +523,7 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwgbGGFhq_PJuZ1HHt84dcA
 let conteos = {};
 let rango = 'hoy';
 let datos = [];
+let llamadasHoy = 0;
 let chartCanales = null;
 let chartTend = null;
 let chartDiaSem = null;
@@ -539,12 +554,27 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarLS();
   initDark();
   renderHistLocal();
+  initLlamadas();
   const _logoEl = document.getElementById('topbar-logo-img');
   if (_logoEl.complete) generarFavicon(); else _logoEl.addEventListener('load', generarFavicon);
 });
 
 function resetConteos() {
   MEDIOS.forEach(m => { conteos[m.id] = {cot: 0, res: 0}; });
+}
+
+
+function initLlamadas() {
+  const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+  llamadasHoy = parseInt(localStorage.getItem('tracker_llamadas_' + hoyMX) || '0', 10);
+  document.getElementById('llamadas-num').textContent = llamadasHoy;
+}
+
+function ajustarLlamada(delta) {
+  llamadasHoy = Math.max(0, llamadasHoy + delta);
+  document.getElementById('llamadas-num').textContent = llamadasHoy;
+  const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+  localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
 }
 
 function setFechaHoy() {
@@ -627,7 +657,7 @@ async function enviarRegistro() {
     toast('📤 Enviando...');
     const res = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({fecha, agente, conteos}),
+      body: JSON.stringify({fecha, agente, conteos, llamadas: llamadasHoy}),
       headers: {'Content-Type': 'text/plain'}
     });
     const json = await res.json();
@@ -636,7 +666,7 @@ async function enviarRegistro() {
       const ban = document.getElementById('banner-ok');
       ban.classList.add('show');
       document.getElementById('banner-det').textContent =
-        `${agente} · ${fecha} · ${tc} cotizaciones · ${tr} reservaciones`;
+        `${agente} · ${fecha} · ${tc} cotizaciones · ${tr} reservaciones · ${llamadasHoy} llamadas`;
       renderHistLocal();
     } else {
       toast('❌ Error: ' + (json.error || 'desconocido'));
@@ -649,7 +679,7 @@ async function enviarRegistro() {
 // ─── HISTORIAL LOCAL ──────────────────────────────────────────────────────────
 function guardarHistLocal(fecha, agente, c) {
   const hist = JSON.parse(localStorage.getItem('tracker_hist') || '[]');
-  hist.unshift({fecha, agente, conteos: c, ts: new Date().toISOString()});
+  hist.unshift({fecha, agente, conteos: c, llamadas: llamadasHoy, ts: new Date().toISOString()});
   localStorage.setItem('tracker_hist', JSON.stringify(hist.slice(0, 60)));
 }
 
@@ -1052,11 +1082,12 @@ function dibujarTendencia(filas) {
 function dibujarTablaAgentes(filas) {
   const por = {};
   filas.forEach(r => {
-    if (!por[r.agente]) por[r.agente] = {cot:0, res:0};
+    if (!por[r.agente]) por[r.agente] = {cot:0, res:0, llamadas:0};
     MEDIOS.forEach(m => {
       por[r.agente].cot += +(r[`cot_${m.id}`]||0);
       por[r.agente].res += +(r[`res_${m.id}`]||0);
     });
+    por[r.agente].llamadas += +(r.llamadas||0);
   });
   const ags = Object.keys(por).sort((a,b) => por[b].cot - por[a].cot);
   if (!ags.length) { document.getElementById('tabla-agentes').innerHTML = ''; return; }
@@ -1067,6 +1098,7 @@ function dibujarTablaAgentes(filas) {
         <th class="th-n">Agente</th>
         <th class="th-c">Cotizaciones</th>
         <th class="th-r">Reservaciones</th>
+        <th class="th-k">Llamadas</th>
         <th class="th-k">Conversión</th>
       </tr></thead>
       <tbody>
@@ -1074,6 +1106,7 @@ function dibujarTablaAgentes(filas) {
           <td style="font-weight:600">${a}</td>
           <td>${por[a].cot}</td>
           <td>${por[a].res}</td>
+          <td>${por[a].llamadas||0}</td>
           <td>${por[a].cot > 0 ? Math.round((por[a].res/por[a].cot)*100)+'%' : '—'}</td>
         </tr>`).join('')}
       </tbody>
