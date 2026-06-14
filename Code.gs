@@ -20,7 +20,8 @@ function doPost(e) {
       new Date().toISOString(),
       data.agente,
       ...MEDIOS.map(m => Number(data.conteos[m]?.cot || 0)),
-      ...MEDIOS.map(m => Number(data.conteos[m]?.res || 0))
+      ...MEDIOS.map(m => Number(data.conteos[m]?.res || 0)),
+      Number(data.llamadas || 0)
     ];
     hoja.appendRow(fila);
 
@@ -72,7 +73,8 @@ function obtenerHoja() {
     const headers = [
       'fecha', 'timestamp', 'agente',
       ...MEDIOS.map(m => `cot_${m}`),
-      ...MEDIOS.map(m => `res_${m}`)
+      ...MEDIOS.map(m => `res_${m}`),
+      'llamadas'
     ];
     hoja.appendRow(headers);
     // Formato visual del encabezado
@@ -94,7 +96,8 @@ function migracion() {
   const esperados = [
     'fecha', 'timestamp', 'agente',
     ...MEDIOS.map(m => `cot_${m}`),
-    ...MEDIOS.map(m => `res_${m}`)
+    ...MEDIOS.map(m => `res_${m}`),
+    'llamadas'
   ];
 
   const actuales = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
