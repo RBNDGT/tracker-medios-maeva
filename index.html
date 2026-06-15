@@ -101,6 +101,7 @@ body.dark .td-res .c-val{color:#4ade80}
 .c-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--gris-borde);background:var(--blanco);cursor:pointer;font-size:17px;font-weight:700;color:var(--texto-suave);display:flex;align-items:center;justify-content:center;transition:.12s;line-height:1;padding:0;font-family:inherit;flex-shrink:0}
 .c-btn.minus:hover{background:#FEE6E6;color:#C0392B;border-color:#E57373}
 .c-btn.plus:hover{background:var(--azul-light);color:var(--azul-dark);border-color:var(--azul)}
+.c-btn.plus.capped{opacity:.22;cursor:not-allowed;pointer-events:none}
 .c-val{font-size:20px;font-weight:800;min-width:34px;text-align:center;color:var(--texto);transition:color .15s,transform .15s}
 .c-val.bump{color:var(--azul);transform:scale(1.25)}
 
@@ -335,7 +336,17 @@ body.dark .ag-table td{border-color:#2d2d2d}
           style="padding:13px 26px;border-radius:12px;border:none;background:var(--azul);color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s"
           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">+ Llamada</button>
       </div>
-      <div style="font-size:11px;text-align:center;color:var(--texto-suave);padding-bottom:4px">Se incluye automáticamente al enviar el registro del día</div>
+      <!-- Barra de presupuesto de contactos -->
+      <div id="budget-bar" style="margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--gris-bg);border:1px solid var(--gris-borde)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+          <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Contactos distribuidos</span>
+          <span id="budget-label" style="font-size:14px;font-weight:800;color:var(--texto)">0 / 0</span>
+        </div>
+        <div style="background:var(--gris-borde);border-radius:99px;height:7px;overflow:hidden">
+          <div id="budget-fill" style="height:100%;border-radius:99px;background:var(--azul);width:0%;transition:width .3s,background .3s"></div>
+        </div>
+        <div id="budget-msg" style="font-size:11px;color:var(--texto-suave);margin-top:7px;text-align:center;line-height:1.4">Registra primero cuántas llamadas realizaste</div>
+      </div>
     </div>
 
     <div class="card">
@@ -598,17 +609,65 @@ function resetConteos() {
 }
 
 
+function getTotalContactos() {
+  return MEDIOS.reduce((s, m) => s + conteos[m.id].cot + conteos[m.id].res, 0);
+}
+
+function actualizarPresupuesto() {
+  const total = getTotalContactos();
+  const cap   = llamadasHoy;
+
+  const label = document.getElementById('budget-label');
+  if (label) label.textContent = `${total} / ${cap}`;
+
+  const fill = document.getElementById('budget-fill');
+  if (fill) {
+    const pct = cap > 0 ? Math.min(100, Math.round((total / cap) * 100)) : 0;
+    fill.style.width   = pct + '%';
+    fill.style.background = (total === cap && cap > 0) ? '#16A34A' : 'var(--azul)';
+  }
+
+  const msg = document.getElementById('budget-msg');
+  if (msg) {
+    if (cap === 0) {
+      msg.textContent = 'Registra primero cuántas llamadas realizaste';
+      msg.style.color = 'var(--texto-suave)';
+    } else if (total === 0) {
+      msg.textContent = `Distribuye ${cap} llamada${cap !== 1 ? 's' : ''} entre cotizaciones y reservaciones`;
+      msg.style.color = 'var(--texto-suave)';
+    } else if (total < cap) {
+      msg.textContent = `Faltan ${cap - total} por distribuir`;
+      msg.style.color = '#B45309';
+    } else {
+      msg.textContent = '✓ Todas las llamadas están distribuidas — listo para enviar';
+      msg.style.color = '#16A34A';
+    }
+  }
+
+  // Bloquear / desbloquear botones +
+  const atCap = cap === 0 || total >= cap;
+  document.querySelectorAll('.c-btn.plus').forEach(btn => btn.classList.toggle('capped', atCap));
+}
+
 function initLlamadas() {
   const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
   llamadasHoy = parseInt(localStorage.getItem('tracker_llamadas_' + hoyMX) || '0', 10);
   document.getElementById('llamadas-num').textContent = llamadasHoy;
+  actualizarPresupuesto();
 }
 
 function ajustarLlamada(delta) {
-  llamadasHoy = Math.max(0, llamadasHoy + delta);
+  const newVal = Math.max(0, llamadasHoy + delta);
+  if (delta < 0 && newVal < getTotalContactos()) {
+    const tot = getTotalContactos();
+    toast(`⚠️ Ya tienes ${tot} contacto${tot !== 1 ? 's' : ''} distribuido${tot !== 1 ? 's' : ''}. Reduce primero los conteos.`);
+    return;
+  }
+  llamadasHoy = newVal;
   document.getElementById('llamadas-num').textContent = llamadasHoy;
   const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
   localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
+  actualizarPresupuesto();
 }
 
 function setFechaHoy() {
@@ -643,6 +702,7 @@ function renderTabla() {
 }
 
 function cambiar(id, tipo, delta) {
+  if (delta > 0 && getTotalContactos() >= llamadasHoy) return;
   conteos[id][tipo] = Math.max(0, conteos[id][tipo] + delta);
   const el = document.getElementById(`v-${tipo}-${id}`);
   el.textContent = conteos[id][tipo];
@@ -651,6 +711,7 @@ function cambiar(id, tipo, delta) {
   el.classList.add('bump');
   setTimeout(() => el.classList.remove('bump'), 200);
   actualizarTotales();
+  actualizarPresupuesto();
 }
 
 function actualizarTotales() {
@@ -669,6 +730,7 @@ function limpiarRegistro() {
     document.getElementById(`v-res-${m.id}`).textContent = '0';
   });
   actualizarTotales();
+  actualizarPresupuesto();
   document.getElementById('banner-ok').classList.remove('show');
 }
 
@@ -684,6 +746,14 @@ async function enviarRegistro() {
 
   const tc = MEDIOS.reduce((a,m) => a + conteos[m.id].cot, 0);
   const tr = MEDIOS.reduce((a,m) => a + conteos[m.id].res, 0);
+
+  if (llamadasHoy === 0) { toast('⚠️ Registra cuántas llamadas realizaste antes de enviar'); return; }
+  const totalContactos = tc + tr;
+  if (totalContactos !== llamadasHoy) {
+    const faltan = llamadasHoy - totalContactos;
+    toast(`⚠️ Faltan ${faltan} llamada${faltan !== 1 ? 's' : ''} por distribuir entre cotizaciones y reservaciones`);
+    return;
+  }
 
   guardarHistLocal(fecha, agente, JSON.parse(JSON.stringify(conteos)));
 
