@@ -28,11 +28,16 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;color
 .topbar-info{background:transparent;padding:10px 20px;display:flex;flex-direction:column;justify-content:center}
 .topbar-title{color:#fff;font-size:15px;font-weight:700;letter-spacing:.03em}
 .topbar-sub{color:rgba(255,255,255,.65);font-size:11px;margin-top:3px;letter-spacing:.02em}
-.topbar-agente{background:rgba(255,255,255,.10);padding:8px 18px;display:flex;align-items:center;gap:8px;margin-left:auto;border-left:1px solid rgba(255,255,255,.15);backdrop-filter:blur(8px)}
-.topbar-agente label{color:rgba(255,255,255,.75);font-size:11px;white-space:nowrap;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-.topbar-agente input{font-size:12px;padding:5px 11px;border:1.5px solid rgba(255,255,255,.25);border-radius:7px;background:rgba(255,255,255,.12);color:#fff;width:160px;outline:none;font-weight:600;font-family:inherit;transition:all .2s}
-.topbar-agente input::placeholder{color:rgba(255,255,255,.4);font-weight:400}
-.topbar-agente input:focus{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.2)}
+.identity-grid{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:0}
+.identity-divider{width:1px;background:var(--gris-borde);align-self:stretch;margin:0 6px}
+.identity-label{font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px}
+.identity-input{font-size:18px;font-weight:700;border:none;border-bottom:2px solid var(--gris-borde);border-radius:0;background:transparent;color:var(--texto);width:100%;padding:4px 0 7px;outline:none;transition:border-color .2s;font-family:inherit}
+.identity-input:focus{border-color:var(--azul)}
+.identity-input::placeholder{color:var(--texto-suave);font-weight:400;font-size:14px}
+.identity-fecha-val{font-size:20px;font-weight:800;color:var(--texto);padding:4px 0 5px;letter-spacing:-.01em}
+body.dark .identity-input{color:#e8f4fb;border-color:#2d2d2d}
+body.dark .identity-input:focus{border-color:#4dd4ff}
+body.dark .identity-divider{background:#2d2d2d}
 .topbar-btns{display:flex;align-items:center;gap:8px;padding:0 16px}
 .topbar-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;transition:.18s;flex-shrink:0;line-height:1;text-decoration:none}
 .topbar-btn:hover{background:rgba(255,255,255,.22)}
@@ -266,8 +271,8 @@ body.dark .ag-table td{border-color:#2d2d2d}
   .topbar-logo img{height:40px}
   .topbar-info{padding:8px 12px}
   .topbar-title{font-size:13px}
-  .topbar-agente{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,.12);justify-content:center;padding:7px 14px}
-  .topbar-agente input{width:100%;max-width:280px}
+  .identity-grid{grid-template-columns:1fr}
+  .identity-divider{width:100%;height:1px;margin:14px 0}
   .topbar-btns{padding:0 10px 0 0}
 }
 @font-face {
@@ -288,10 +293,6 @@ body.dark .ag-table td{border-color:#2d2d2d}
   <div class="topbar-info">
     <div class="topbar-title">Tracker de Medios · Reservaciones</div>
     <div class="topbar-sub">Club Maeva Miramar · Tampico</div>
-  </div>
-  <div class="topbar-agente">
-    <label>👤 Agente</label>
-    <input type="text" id="inp-agente" placeholder="Tu nombre completo" oninput="guardarAgente()">
   </div>
   <div class="topbar-btns">
     <button class="topbar-btn" onclick="toggleDark()" title="Modo oscuro">🌙</button>
@@ -319,13 +320,23 @@ body.dark .ag-table td{border-color:#2d2d2d}
       </div>
     </div>
 
-    <div class="card card-accent">
-      <div class="sec">Fecha del registro</div>
-      <div style="max-width:280px">
-        <label>Fecha del registro</label>
-        <input type="date" id="inp-fecha" style="cursor:default;background:var(--gris-bg);color:var(--texto-suave);pointer-events:none" title="La fecha se asigna automáticamente al día actual (hora México)">
-        <div style="font-size:11px;color:var(--texto-suave);margin-top:5px;display:flex;align-items:center;gap:5px">
-          <span style="font-size:13px">🔒</span> Fecha automática · Hora centro de México
+    <div class="card" style="border-top:3px solid var(--azul)">
+      <div class="identity-grid">
+        <!-- Nombre del ejecutivo -->
+        <div style="padding-right:18px">
+          <div class="identity-label">Ejecutivo</div>
+          <input type="text" id="inp-agente" placeholder="Tu nombre completo" oninput="guardarAgente()" class="identity-input" autocomplete="name" spellcheck="false">
+          <div style="font-size:11px;color:var(--texto-suave);margin-top:6px">Se guarda automáticamente en este dispositivo</div>
+        </div>
+        <div class="identity-divider"></div>
+        <!-- Fecha del registro -->
+        <div style="padding-left:18px">
+          <div class="identity-label">Fecha del registro</div>
+          <div class="identity-fecha-val" id="fecha-display">—</div>
+          <div style="font-size:11px;color:var(--texto-suave);margin-top:6px;display:flex;align-items:center;gap:4px">
+            <span>🔒</span> Automática · Hora México
+          </div>
+          <input type="date" id="inp-fecha" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" tabindex="-1">
         </div>
       </div>
     </div>
@@ -679,11 +690,12 @@ function ajustarLlamada(delta) {
 }
 
 function setFechaHoy() {
-  // Fecha en zona horaria de México (Centro UTC-6/UTC-5)
   const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
-  const inp = document.getElementById('inp-fecha');
-  inp.value    = hoyMX;
-  inp.readOnly = true;
+  document.getElementById('inp-fecha').value = hoyMX;
+  const [y, m, d] = hoyMX.split('-');
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const el = document.getElementById('fecha-display');
+  if (el) el.textContent = `${parseInt(d)} · ${meses[+m-1]} · ${y}`;
 }
 
 // ─── TABLA ────────────────────────────────────────────────────────────────────
