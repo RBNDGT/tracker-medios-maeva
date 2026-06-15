@@ -176,6 +176,11 @@ code{font-family:'Courier New',monospace;background:var(--azul-light);color:var(
 .insight-card .insight-title{font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
 .insight-card ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:7px}
 .insight-card li{font-size:12.5px;color:var(--texto);line-height:1.5}
+.ll-chip{font-size:12px;padding:5px 14px;border-radius:20px;border:1.5px solid rgba(196,87,46,.35);background:transparent;color:#C4572E;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
+.ll-chip:hover{background:rgba(196,87,46,.1)}
+.ll-chip.active{background:#C4572E;color:#fff;border-color:#C4572E}
+body.dark .ll-chip{border-color:rgba(232,122,90,.4);color:#e87a5a}
+body.dark .ll-chip.active{background:#C4572E;color:#fff}
 .mini-kpi{background:var(--blanco);border:1px solid rgba(196,87,46,.2);border-top:3px solid #C4572E;border-radius:12px;padding:.75rem 1rem;flex:1;min-width:130px}
 .mini-kpi-label{font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
 .mini-kpi-val{font-size:22px;font-weight:800;color:var(--texto);line-height:1.2}
@@ -463,13 +468,15 @@ body.dark .ag-table td{border-color:#2d2d2d}
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <div class="sec" style="margin-bottom:0">Llamadas — Panel ejecutivo</div>
       </div>
-      <!-- Selector de fechas propio del panel -->
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 12px;background:var(--gris-bg);border-radius:10px;border:1px solid rgba(196,87,46,.15)">
-        <span style="font-size:11px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Ver período:</span>
-        <input type="date" id="ll-desde" onchange="renderPanelLlamadas()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1.5px solid rgba(196,87,46,.35);color:var(--texto);font-weight:600;background:var(--blanco);font-family:inherit;cursor:pointer">
-        <span style="font-size:12px;color:var(--texto-suave);font-weight:500">al</span>
-        <input type="date" id="ll-hasta" onchange="renderPanelLlamadas()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1.5px solid rgba(196,87,46,.35);color:var(--texto);font-weight:600;background:var(--blanco);font-family:inherit;cursor:pointer">
-        <button onclick="document.getElementById('ll-desde').value='';document.getElementById('ll-hasta').value='';renderPanelLlamadas()" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1.5px solid rgba(196,87,46,.4);background:transparent;color:#C4572E;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s" onmouseover="this.style.background='rgba(196,87,46,.08)'" onmouseout="this.style.background='transparent'">× Limpiar</button>
+      <!-- Filtros rápidos del panel de llamadas -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+        <button class="ll-chip" onclick="setLlRango('semana',this)">Esta semana</button>
+        <button class="ll-chip" onclick="setLlRango('mes',this)">Este mes</button>
+        <button class="ll-chip" onclick="setLlRango('3m',this)">3 meses</button>
+        <button class="ll-chip" onclick="setLlRango('6m',this)">6 meses</button>
+        <button class="ll-chip" onclick="setLlRango('dia',this)">Día específico</button>
+        <input type="date" id="ll-dia-input" onchange="renderPanelLlamadas()" style="display:none;font-size:12px;padding:5px 10px;border-radius:8px;border:1.5px solid rgba(196,87,46,.4);color:var(--texto);font-weight:600;background:var(--blanco);font-family:inherit;cursor:pointer">
+        <button id="ll-chip-reset" onclick="resetLlRango()" style="display:none;font-size:11px;padding:5px 12px;border-radius:8px;border:1.5px solid rgba(196,87,46,.4);background:transparent;color:#C4572E;font-weight:700;cursor:pointer;font-family:inherit">× Limpiar</button>
         <span id="ll-periodo-label" style="font-size:11px;color:var(--texto-suave);margin-left:auto;font-style:italic"></span>
       </div>
       <div id="lkpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -572,6 +579,7 @@ let chartCanales = null;
 let chartTend = null;
 let chartDiaSem = null;
 let chartLlamadas = null;
+let llRangoActivo = '';
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 
@@ -1218,20 +1226,72 @@ function dibujarTablaAgentes(filas) {
     </table>`;
 }
 
+function setLlRango(r, btn) {
+  llRangoActivo = r;
+  document.querySelectorAll('.ll-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const diaInput = document.getElementById('ll-dia-input');
+  const resetBtn = document.getElementById('ll-chip-reset');
+  if (diaInput) diaInput.style.display = r === 'dia' ? 'inline-block' : 'none';
+  if (resetBtn) resetBtn.style.display = 'inline-block';
+  if (r !== 'dia') renderPanelLlamadas();
+}
+
+function resetLlRango() {
+  llRangoActivo = '';
+  document.querySelectorAll('.ll-chip').forEach(b => b.classList.remove('active'));
+  const diaInput = document.getElementById('ll-dia-input');
+  const resetBtn = document.getElementById('ll-chip-reset');
+  if (diaInput) { diaInput.style.display = 'none'; diaInput.value = ''; }
+  if (resetBtn) resetBtn.style.display = 'none';
+  renderPanelLlamadas();
+}
+
+function getFiltroLlamadas() {
+  const hoy = new Date();
+  const hoyS = fechaStr(hoy);
+  switch (llRangoActivo) {
+    case 'semana': {
+      const dow   = hoy.getDay();
+      const lunes = new Date(hoy);
+      lunes.setDate(hoy.getDate() - (dow === 0 ? 6 : dow - 1));
+      const dom = new Date(lunes);
+      dom.setDate(lunes.getDate() + 6);
+      return { desde: fechaStr(lunes), hasta: fechaStr(dom), label: 'Esta semana' };
+    }
+    case 'mes': {
+      const d1 = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      return { desde: fechaStr(d1), hasta: hoyS, label: 'Este mes' };
+    }
+    case '3m': {
+      const d1 = new Date(hoy); d1.setMonth(d1.getMonth() - 3);
+      return { desde: fechaStr(d1), hasta: hoyS, label: 'Últimos 3 meses' };
+    }
+    case '6m': {
+      const d1 = new Date(hoy); d1.setMonth(d1.getMonth() - 6);
+      return { desde: fechaStr(d1), hasta: hoyS, label: 'Últimos 6 meses' };
+    }
+    case 'dia': {
+      const v = document.getElementById('ll-dia-input')?.value;
+      if (!v) return null;
+      return { desde: v, hasta: v, label: v };
+    }
+    default:
+      return null;
+  }
+}
+
 function renderPanelLlamadas() {
   // ─── Filtro propio del panel (independiente del dashboard) ─────────────────
-  const desdeLl = document.getElementById('ll-desde')?.value;
-  const hastaLl = document.getElementById('ll-hasta')?.value;
+  const filtro = getFiltroLlamadas();
   let filasLl;
-  if (desdeLl || hastaLl) {
-    const desde = desdeLl || '0000-00-00';
-    const hasta = hastaLl || '9999-99-99';
+  if (filtro) {
     filasLl = datos.filter(r => {
       const f = String(r.fecha).substring(0, 10);
-      return f >= desde && f <= hasta;
+      return f >= filtro.desde && f <= filtro.hasta;
     });
     const label = document.getElementById('ll-periodo-label');
-    if (label) label.textContent = desdeLl && hastaLl ? `${desdeLl} → ${hastaLl}` : desdeLl ? `Desde ${desdeLl}` : `Hasta ${hastaLl}`;
+    if (label) label.textContent = filtro.label;
   } else {
     filasLl = filtrarDatos();
     const label = document.getElementById('ll-periodo-label');
@@ -1306,7 +1366,8 @@ function renderPanelLlamadas() {
             return `rgba(196,87,46,${(v / max * 0.5 + 0.45).toFixed(2)})`;
           }),
           borderRadius: 6,
-          borderSkipped: false
+          borderSkipped: false,
+          maxBarThickness: 52
         }]
       },
       options: {
