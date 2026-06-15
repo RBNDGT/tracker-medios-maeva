@@ -451,7 +451,15 @@ body.dark .ag-table td{border-color:#2d2d2d}
     <div class="card" style="border-top:3px solid #C4572E">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <div class="sec" style="margin-bottom:0">Llamadas — Panel ejecutivo</div>
-        <span style="font-size:10px;font-weight:700;background:rgba(196,87,46,.12);color:#9E3E1E;border-radius:20px;padding:3px 9px;text-transform:uppercase;letter-spacing:.06em">diario</span>
+      </div>
+      <!-- Selector de fechas propio del panel -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 12px;background:var(--gris-bg);border-radius:10px;border:1px solid rgba(196,87,46,.15)">
+        <span style="font-size:11px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Ver período:</span>
+        <input type="date" id="ll-desde" onchange="renderPanelLlamadas()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1.5px solid rgba(196,87,46,.35);color:var(--texto);font-weight:600;background:var(--blanco);font-family:inherit;cursor:pointer">
+        <span style="font-size:12px;color:var(--texto-suave);font-weight:500">al</span>
+        <input type="date" id="ll-hasta" onchange="renderPanelLlamadas()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1.5px solid rgba(196,87,46,.35);color:var(--texto);font-weight:600;background:var(--blanco);font-family:inherit;cursor:pointer">
+        <button onclick="document.getElementById('ll-desde').value='';document.getElementById('ll-hasta').value='';renderPanelLlamadas()" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1.5px solid rgba(196,87,46,.4);background:transparent;color:#C4572E;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s" onmouseover="this.style.background='rgba(196,87,46,.08)'" onmouseout="this.style.background='transparent'">× Limpiar</button>
+        <span id="ll-periodo-label" style="font-size:11px;color:var(--texto-suave);margin-left:auto;font-style:italic"></span>
       </div>
       <div id="lkpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
       <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Tendencia del equipo</div>
@@ -874,7 +882,7 @@ function renderDashboard() {
   dibujarTendencia(filas);
   dibujarDiaSemana(filas);
   dibujarTablaAgentes(filas);
-  renderPanelLlamadas(filas);
+  renderPanelLlamadas();
 }
 
 function filtrarPeriodoAnterior() {
@@ -1140,11 +1148,30 @@ function dibujarTablaAgentes(filas) {
     </table>`;
 }
 
-function renderPanelLlamadas(filas) {
+function renderPanelLlamadas() {
+  // ─── Filtro propio del panel (independiente del dashboard) ─────────────────
+  const desdeLl = document.getElementById('ll-desde')?.value;
+  const hastaLl = document.getElementById('ll-hasta')?.value;
+  let filasLl;
+  if (desdeLl || hastaLl) {
+    const desde = desdeLl || '0000-00-00';
+    const hasta = hastaLl || '9999-99-99';
+    filasLl = datos.filter(r => {
+      const f = String(r.fecha).substring(0, 10);
+      return f >= desde && f <= hasta;
+    });
+    const label = document.getElementById('ll-periodo-label');
+    if (label) label.textContent = desdeLl && hastaLl ? `${desdeLl} → ${hastaLl}` : desdeLl ? `Desde ${desdeLl}` : `Hasta ${hastaLl}`;
+  } else {
+    filasLl = filtrarDatos();
+    const label = document.getElementById('ll-periodo-label');
+    if (label) label.textContent = 'Usando filtro del dashboard';
+  }
+
   // ─── Acumular fechas únicas y agentes ──────────────────────────────────────
   const fechasSet = new Set();
   const agentesSet = new Set();
-  filas.forEach(r => {
+  filasLl.forEach(r => {
     const f = String(r.fecha).substring(0, 10);
     if (f) fechasSet.add(f);
     if (r.agente) agentesSet.add(r.agente);
@@ -1155,7 +1182,7 @@ function renderPanelLlamadas(filas) {
   // ─── Matriz agente × fecha ─────────────────────────────────────────────────
   const matrix = {};
   agentes.forEach(a => { matrix[a] = {}; fechas.forEach(f => { matrix[a][f] = 0; }); });
-  filas.forEach(r => {
+  filasLl.forEach(r => {
     const f = String(r.fecha).substring(0, 10);
     if (matrix[r.agente] && f) matrix[r.agente][f] += +(r.llamadas || 0);
   });
@@ -1184,10 +1211,10 @@ function renderPanelLlamadas(filas) {
       <div class="mini-kpi-label">Promedio / agente</div>
       <div class="mini-kpi-val">${agentes.length > 0 ? (totalGeneral / agentes.length).toFixed(1) : '—'}</div>
     </div>
-    <div class="mini-kpi" style="border-top-color:#C4572E">
+    <div class="mini-kpi">
       <div class="mini-kpi-label">Líder del periodo</div>
       <div class="mini-kpi-val" style="font-size:16px">${lider
-        ? `${lider}<span style="font-size:12px;color:var(--texto-suave);font-weight:600;margin-left:7px">${totalPorAgente[lider]} llamadas</span>`
+        ? `${lider}<span style="font-size:12px;color:var(--texto-suave);font-weight:600;margin-left:7px">${totalPorAgente[lider]} ll.</span>`
         : '—'}</div>
     </div>`;
 
@@ -1203,16 +1230,23 @@ function renderPanelLlamadas(filas) {
         datasets: [{
           label: 'Llamadas equipo',
           data: fechas.map(f => totalPorDia[f]),
-          backgroundColor: 'rgba(196,87,46,.75)',
+          backgroundColor: fechas.map(f => {
+            const v = totalPorDia[f];
+            const max = Math.max(...fechas.map(x => totalPorDia[x]), 1);
+            return `rgba(196,87,46,${(v / max * 0.5 + 0.45).toFixed(2)})`;
+          }),
           borderRadius: 6,
           borderSkipped: false
         }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: c.text, font: { family: 'Inter', size: 12 } } } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} llamadas` } }
+        },
         scales: {
-          x: { grid: { display: false }, ticks: { color: c.textB, font: { family: 'Inter', weight: '600', size: 11 } } },
+          x: { grid: { display: false }, ticks: { color: c.textB, font: { family: 'Inter', weight: '600', size: 12 } } },
           y: { grid: { color: c.grid }, ticks: { color: c.text, font: { family: 'Inter', size: 11 }, stepSize: 1 }, beginAtZero: true }
         }
       }
@@ -1227,40 +1261,43 @@ function renderPanelLlamadas(filas) {
   }
 
   const maxVal = Math.max(...agentes.map(a => Math.max(...fechas.map(f => matrix[a][f] || 0))), 1);
-  const colsFecha = fechas.map(f => { const [,mo,d] = f.split('-'); return `${d}/${mo}`; });
 
-  let html = `<div style="overflow-x:auto"><table class="ll-matrix" style="width:100%;border-collapse:collapse;min-width:${140 + fechas.length * 72}px">
+  let html = `<div style="overflow-x:auto"><table class="ll-matrix" style="width:100%;border-collapse:collapse;min-width:${140 + fechas.length * 76}px">
     <thead><tr>
       <th style="text-align:left;min-width:130px;border-radius:6px 0 0 6px">Ejecutivo</th>
-      ${colsFecha.map((d, i) => {
-        const dTotal = totalPorDia[fechas[i]];
-        return `<th style="text-align:center;min-width:64px">${d}<br><span style="font-size:10px;opacity:.7;font-weight:600">${dTotal} tot.</span></th>`;
+      ${fechas.map(f => {
+        const [,mo,d] = f.split('-');
+        const dTotal = totalPorDia[f];
+        return `<th style="text-align:center;min-width:68px">${d}/${mo}<br><span style="font-size:10px;opacity:.65;font-weight:500">${dTotal} total</span></th>`;
       }).join('')}
-      <th style="text-align:center;min-width:70px;background:rgba(196,87,46,.15);color:#9E3E1E;border-radius:0 6px 6px 0">Total</th>
+      <th style="text-align:center;min-width:72px;background:rgba(196,87,46,.18);color:#9E3E1E;border-radius:0 6px 6px 0">Total</th>
     </tr></thead>
     <tbody>`;
 
   agsSorted.forEach(a => {
     const total = totalPorAgente[a];
     html += `<tr>
-      <td style="font-weight:600">${a}</td>
+      <td style="font-weight:700;padding-left:14px">${a}</td>
       ${fechas.map(f => {
         const v = matrix[a][f] || 0;
-        const opacity = v > 0 ? (v / maxVal * 0.45 + 0.08).toFixed(2) : '0';
-        const bg = v > 0 ? `background:rgba(196,87,46,${opacity})` : '';
-        return `<td style="text-align:center;${bg}">${v > 0
-          ? `<strong style="color:${v === maxVal ? '#9E3E1E' : 'inherit'}">${v}</strong>`
-          : `<span style="color:var(--texto-suave);opacity:.35">—</span>`}</td>`;
+        if (v === 0) {
+          return `<td style="text-align:center"><span style="font-size:13px;color:var(--texto-suave);opacity:.3">—</span></td>`;
+        }
+        const opacity = (v / maxVal * 0.55 + 0.3).toFixed(2);
+        return `<td style="text-align:center;background:rgba(196,87,46,${opacity})"><strong style="color:#fff;font-size:15px;text-shadow:0 1px 2px rgba(0,0,0,.35)">${v}</strong></td>`;
       }).join('')}
-      <td class="col-total">${total}</td>
+      <td style="text-align:center;font-weight:800;font-size:15px;color:#C4572E;background:rgba(196,87,46,.12)">${total}</td>
     </tr>`;
   });
 
   // Fila de totales
   html += `<tr class="fila-total">
-    <td style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--texto-suave)">Total equipo</td>
-    ${fechas.map(f => `<td style="text-align:center;font-weight:700">${totalPorDia[f] || 0}</td>`).join('')}
-    <td class="col-total">${totalGeneral}</td>
+    <td style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--texto-suave);padding-left:14px">Total equipo</td>
+    ${fechas.map(f => {
+      const v = totalPorDia[f] || 0;
+      return `<td style="text-align:center;font-weight:700;font-size:14px;color:var(--texto)">${v}</td>`;
+    }).join('')}
+    <td style="text-align:center;font-weight:800;font-size:16px;color:#C4572E;background:rgba(196,87,46,.18)">${totalGeneral}</td>
   </tr>`;
 
   html += `</tbody></table></div>`;
