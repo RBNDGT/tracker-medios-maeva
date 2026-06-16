@@ -37,6 +37,14 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:14px;color
 .identity-fecha-val{font-size:20px;font-weight:800;color:var(--texto);padding:4px 0 5px;letter-spacing:-.01em}
 body.dark .identity-input{color:#e8f4fb;border-color:#2d2d2d}
 body.dark .identity-input:focus{border-color:#4dd4ff}
+select.identity-input{appearance:auto;-webkit-appearance:menulist;cursor:pointer}
+.agente-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:var(--gris-bg);margin-bottom:6px}
+.agente-row-nombre{font-size:14px;font-weight:600;color:var(--texto)}
+.agente-row-btns{display:flex;gap:6px}
+.agente-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--gris-borde);background:var(--blanco);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:.15s;padding:0}
+.agente-btn:hover{background:var(--azul-light);border-color:var(--azul)}
+.agente-btn.del:hover{background:#FEE6E6;border-color:#E57373}
+body.dark .agente-btn.del:hover{background:#3a1414;border-color:#E57373}
 body.dark .identity-divider{background:#2d2d2d}
 .topbar-btns{display:flex;align-items:center;gap:8px;padding:0 16px}
 .topbar-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;transition:.18s;flex-shrink:0;line-height:1;text-decoration:none}
@@ -325,7 +333,9 @@ body.dark .ag-table td{border-color:#2d2d2d}
         <!-- Nombre del ejecutivo -->
         <div style="padding-right:18px">
           <div class="identity-label">Ejecutivo</div>
-          <input type="text" id="inp-agente" placeholder="Tu nombre completo" oninput="guardarAgente()" class="identity-input" autocomplete="name" spellcheck="false">
+          <select id="inp-agente" onchange="guardarAgente()" class="identity-input">
+            <option value="">Selecciona tu nombre</option>
+          </select>
           <div style="font-size:11px;color:var(--texto-suave);margin-top:6px">Se guarda automáticamente en este dispositivo</div>
         </div>
         <div class="identity-divider"></div>
@@ -521,6 +531,18 @@ body.dark .ag-table td{border-color:#2d2d2d}
       <span id="test-res" style="font-size:13px;color:var(--texto-suave)"></span>
     </div>
 
+    <div class="card card-accent">
+      <div class="sec">Gestión de ejecutivos</div>
+      <p style="font-size:12px;color:var(--texto-suave);margin-bottom:14px;line-height:1.6">
+        Esta lista alimenta el selector de nombre en "Mi Registro". Los cambios se sincronizan con la hoja de Google para todas las computadoras del hotel.
+      </p>
+      <div id="admin-agentes-lista" style="margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="nuevo-agente-input" placeholder="Nombre del nuevo ejecutivo" style="flex:1" onkeydown="if(event.key==='Enter'){agregarAgenteUI()}">
+        <button class="btn btn-primary" onclick="agregarAgenteUI()">+ Agregar</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="sec">Instrucciones de configuración</div>
       <div class="step">
@@ -615,6 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resetConteos();
   renderTabla();
   setFechaHoy();
+  cargarAgentes();
   cargarLS();
   initDark();
   renderHistLocal();
@@ -1469,7 +1492,118 @@ function cargarLS() {
   } else {
     document.getElementById('inp-url').value = localStorage.getItem('tracker_url') || '';
   }
-  document.getElementById('inp-agente').value = localStorage.getItem('tracker_agente') || '';
+}
+
+// ─── LISTA DE EJECUTIVOS ────────────────────────────────────────────────────
+const AGENTES_DEFAULT = ['Rubén','Ana Paula','Sara','Laura','Lizeth','Norma','Linda','Priscila','Adriana'];
+let AGENTES = [];
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function cargarAgentes() {
+  const cache = localStorage.getItem('tracker_agentes_cache');
+  AGENTES = cache ? JSON.parse(cache) : AGENTES_DEFAULT.slice();
+  renderSelectAgente();
+  renderAdminAgentes();
+
+  const url = getUrl();
+  if (!url) return;
+  try {
+    const res  = await fetch(url + '?action=agentes');
+    const json = await res.json();
+    if (json.ok && Array.isArray(json.agentes) && json.agentes.length) {
+      AGENTES = json.agentes;
+      localStorage.setItem('tracker_agentes_cache', JSON.stringify(AGENTES));
+      renderSelectAgente();
+      renderAdminAgentes();
+    }
+  } catch {}
+}
+
+function renderSelectAgente() {
+  const sel = document.getElementById('inp-agente');
+  if (!sel) return;
+  const actual    = sel.value || localStorage.getItem('tracker_agente') || '';
+  const ordenados = AGENTES.slice().sort((a, b) => a.localeCompare(b, 'es'));
+  sel.innerHTML = '<option value="">Selecciona tu nombre</option>' +
+    ordenados.map(n => `<option value="${escapeHtml(n)}"${n === actual ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+}
+
+function renderAdminAgentes() {
+  const el = document.getElementById('admin-agentes-lista');
+  if (!el) return;
+  const ordenados = AGENTES.slice().sort((a, b) => a.localeCompare(b, 'es'));
+  if (!ordenados.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--texto-suave);padding:6px 0">No hay ejecutivos en la lista.</p>';
+    return;
+  }
+  el.innerHTML = ordenados.map(n => `
+    <div class="agente-row">
+      <span class="agente-row-nombre">${escapeHtml(n)}</span>
+      <div class="agente-row-btns">
+        <button class="agente-btn" data-nombre="${escapeHtml(n)}" onclick="editarAgente(this.dataset.nombre)" title="Editar">✏️</button>
+        <button class="agente-btn del" data-nombre="${escapeHtml(n)}" onclick="eliminarAgente(this.dataset.nombre)" title="Eliminar">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+async function guardarListaAgentes() {
+  localStorage.setItem('tracker_agentes_cache', JSON.stringify(AGENTES));
+  const url = getUrl();
+  if (!url) { toast('⚠️ Configura la URL del Apps Script para sincronizar'); return; }
+  try {
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ accion: 'guardar_agentes', lista: AGENTES }),
+      headers: { 'Content-Type': 'text/plain' }
+    });
+  } catch {
+    toast('⚠️ No se pudo sincronizar con el servidor. Se guardó solo en este dispositivo.');
+  }
+}
+
+async function agregarAgenteUI() {
+  const inp    = document.getElementById('nuevo-agente-input');
+  const nombre = inp.value.trim();
+  if (!nombre) { toast('⚠️ Escribe un nombre'); return; }
+  if (AGENTES.some(n => n.toLowerCase() === nombre.toLowerCase())) {
+    toast('⚠️ Ese nombre ya existe en la lista');
+    return;
+  }
+  AGENTES.push(nombre);
+  inp.value = '';
+  renderAdminAgentes();
+  renderSelectAgente();
+  await guardarListaAgentes();
+  toast('✅ Ejecutivo agregado');
+}
+
+async function editarAgente(nombreActual) {
+  const nuevo = prompt('Editar nombre del ejecutivo:', nombreActual);
+  if (nuevo === null) return;
+  const limpio = nuevo.trim();
+  if (!limpio) { toast('⚠️ El nombre no puede estar vacío'); return; }
+  const idx = AGENTES.findIndex(n => n === nombreActual);
+  if (idx === -1) return;
+  AGENTES[idx] = limpio;
+  if (localStorage.getItem('tracker_agente') === nombreActual) {
+    localStorage.setItem('tracker_agente', limpio);
+  }
+  renderAdminAgentes();
+  renderSelectAgente();
+  await guardarListaAgentes();
+  toast('✅ Nombre actualizado');
+}
+
+async function eliminarAgente(nombre) {
+  if (!confirm(`¿Eliminar a "${nombre}" de la lista de ejecutivos?`)) return;
+  AGENTES = AGENTES.filter(n => n !== nombre);
+  renderAdminAgentes();
+  renderSelectAgente();
+  await guardarListaAgentes();
+  toast('🗑️ Ejecutivo eliminado');
 }
 
 async function probarConexion() {
