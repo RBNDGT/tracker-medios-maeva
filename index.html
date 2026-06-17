@@ -446,7 +446,7 @@ body.dark .ag-table td{border-color:#2d2d2d}
       <div class="kpi-card dorado">
         <div class="kpi-label">Conversión</div>
         <div class="kpi-val" id="kpi-conv">—</div>
-        <div class="kpi-sub">res / cot <span id="kpi-delta-conv"></span></div>
+        <div class="kpi-sub">res / contactos <span id="kpi-delta-conv"></span></div>
       </div>
       <div class="kpi-card gris">
         <div class="kpi-label">Canal #1 (volumen)</div>
@@ -762,7 +762,7 @@ function actualizarTotales() {
   MEDIOS.forEach(m => { tc += conteos[m.id].cot; tr += conteos[m.id].res; });
   document.getElementById('tot-cot').textContent = tc;
   document.getElementById('tot-res').textContent = tr;
-  document.getElementById('tot-conv').textContent = tc > 0 ? Math.round((tr/tc)*100)+'%' : '—';
+  document.getElementById('tot-conv').textContent = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100)+'%' : '—';
 }
 
 function limpiarRegistro() {
@@ -951,7 +951,7 @@ function renderDashboard() {
 
   document.getElementById('kpi-cot').textContent  = tc;
   document.getElementById('kpi-res').textContent  = tr;
-  document.getElementById('kpi-conv').textContent = tc > 0 ? Math.round((tr/tc)*100)+'%' : '—';
+  document.getElementById('kpi-conv').textContent = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100)+'%' : '—';
 
   let topId = MEDIOS[0].id, topV = 0;
   MEDIOS.forEach(m => { if (porMedio[m.id].cot > topV) { topV = porMedio[m.id].cot; topId = m.id; } });
@@ -959,25 +959,26 @@ function renderDashboard() {
   document.getElementById('kpi-top').textContent     = topM ? topM.label : '—';
   document.getElementById('kpi-top-sub').textContent = `${topV} cotizaciones`;
 
-  // ICC — Canal más eficiente (mínimo 3 cotizaciones para evitar falsos positivos)
+  // ICC — Canal más eficiente (mínimo 3 contactos para evitar falsos positivos)
   let efId = null, efConv = 0;
   MEDIOS.forEach(m => {
-    if (porMedio[m.id].cot >= 3) {
-      const cv = porMedio[m.id].res / porMedio[m.id].cot;
+    const totalM = porMedio[m.id].cot + porMedio[m.id].res;
+    if (totalM >= 3) {
+      const cv = porMedio[m.id].res / totalM;
       if (cv > efConv) { efConv = cv; efId = m.id; }
     }
   });
   const efM = MEDIOS.find(m => m.id === efId);
   document.getElementById('kpi-eficiente').textContent    = efM ? efM.label : '—';
-  document.getElementById('kpi-eficiente-sub').textContent = efM ? Math.round(efConv*100)+'% conversión' : 'min. 3 cotizaciones';
+  document.getElementById('kpi-eficiente-sub').textContent = efM ? Math.round(efConv*100)+'% conversión' : 'min. 3 contactos';
 
   // Deltas vs periodo anterior
   const filasAnt = filtrarPeriodoAnterior();
   const { tc: tcA, tr: trA } = filasAnt.length ? calcTotales(filasAnt) : { tc: 0, tr: 0 };
   renderDelta('kpi-delta-cot', tc, tcA);
   renderDelta('kpi-delta-res', tr, trA);
-  const convAct = tc > 0 ? Math.round((tr/tc)*100) : null;
-  const convAnt = tcA > 0 ? Math.round((trA/tcA)*100) : null;
+  const convAct = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100) : null;
+  const convAnt = (tcA + trA) > 0 ? Math.round(tasaConv(trA, tcA)*100) : null;
   if (convAct !== null && convAnt !== null) renderDelta('kpi-delta-conv', convAct, convAnt);
   else document.getElementById('kpi-delta-conv').innerHTML = '';
 
@@ -1029,6 +1030,13 @@ function filtrarPeriodoAnterior() {
   });
 }
 
+// Conversión = reservaciones sobre el total de contactos (cot+res), no sobre cotizaciones —
+// cot y res son resultados paralelos de una misma llamada, no etapas de un mismo embudo.
+function tasaConv(res, cot) {
+  const total = cot + res;
+  return total > 0 ? res / total : 0;
+}
+
 function calcTotales(filas) {
   let tc = 0, tr = 0;
   filas.forEach(r => MEDIOS.forEach(m => {
@@ -1050,14 +1058,15 @@ function renderDelta(id, actual, anterior) {
 
 function generarInsights(filas, porMedio, tc, tr, filasAnt) {
   const ins = [];
-  if (filas.length < 2 || tc < 5) return ins;
-  const convGral = tc > 0 ? tr / tc : 0;
+  if (filas.length < 2 || (tc + tr) < 5) return ins;
+  const convGral = tasaConv(tr, tc);
 
   // Canal más eficiente vs promedio general
   let mejorId = null, mejorConv = 0;
   MEDIOS.forEach(m => {
-    if (porMedio[m.id].cot >= 3) {
-      const cv = porMedio[m.id].res / porMedio[m.id].cot;
+    const totalM = porMedio[m.id].cot + porMedio[m.id].res;
+    if (totalM >= 3) {
+      const cv = porMedio[m.id].res / totalM;
       if (cv > mejorConv) { mejorConv = cv; mejorId = m.id; }
     }
   });
@@ -1069,16 +1078,18 @@ function generarInsights(filas, porMedio, tc, tr, filasAnt) {
 
   // Canal de alto volumen, baja conversión
   let peorId = null, peorConv = Infinity;
+  const totalGral = tc + tr;
   MEDIOS.forEach(m => {
-    const cot = porMedio[m.id].cot;
-    if (cot >= 5 && cot / tc >= 0.15) {
-      const cv = porMedio[m.id].res / cot;
+    const totalM = porMedio[m.id].cot + porMedio[m.id].res;
+    if (totalM >= 5 && totalM / totalGral >= 0.15) {
+      const cv = porMedio[m.id].res / totalM;
       if (cv < convGral * 0.6 && cv < peorConv) { peorConv = cv; peorId = m.id; }
     }
   });
   if (peorId) {
     const label = MEDIOS.find(m => m.id === peorId).label;
-    const pctVol = Math.round(porMedio[peorId].cot / tc * 100);
+    const totalPeor = porMedio[peorId].cot + porMedio[peorId].res;
+    const pctVol = Math.round(totalPeor / totalGral * 100);
     ins.push(`⚠️ <strong>${label}</strong> genera el ${pctVol}% del volumen pero solo ${Math.round(peorConv*100)}% de conversión — revisar seguimiento`);
   }
 
@@ -1107,8 +1118,9 @@ function generarInsights(filas, porMedio, tc, tr, filasAnt) {
   if (agentes.length > 1) {
     let mejorAg = null, mejorAgConv = 0;
     agentes.forEach(ag => {
-      if (porAgente[ag].cot >= 5) {
-        const cv = porAgente[ag].res / porAgente[ag].cot;
+      const totalAg = porAgente[ag].cot + porAgente[ag].res;
+      if (totalAg >= 5) {
+        const cv = porAgente[ag].res / totalAg;
         if (cv > mejorAgConv) { mejorAgConv = cv; mejorAg = ag; }
       }
     });
@@ -1255,7 +1267,7 @@ function dibujarTablaAgentes(filas) {
           <td>${por[a].cot}</td>
           <td>${por[a].res}</td>
           <td>${por[a].llamadas||0}</td>
-          <td>${por[a].cot > 0 ? Math.round((por[a].res/por[a].cot)*100)+'%' : '—'}</td>
+          <td>${(por[a].cot + por[a].res) > 0 ? Math.round(tasaConv(por[a].res, por[a].cot)*100)+'%' : '—'}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;

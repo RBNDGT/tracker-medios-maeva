@@ -29,7 +29,8 @@ function doPost(e) {
       new Date().toISOString(),
       data.agente,
       ...MEDIOS.map(m => Number(data.conteos[m]?.cot || 0)),
-      ...MEDIOS.map(m => Number(data.conteos[m]?.res || 0))
+      ...MEDIOS.map(m => Number(data.conteos[m]?.res || 0)),
+      Number(data.llamadas || 0)
     ];
     hoja.appendRow(fila);
 
@@ -89,13 +90,21 @@ function obtenerHoja() {
     const headers = [
       'fecha', 'timestamp', 'agente',
       ...MEDIOS.map(m => `cot_${m}`),
-      ...MEDIOS.map(m => `res_${m}`)
+      ...MEDIOS.map(m => `res_${m}`),
+      'llamadas'
     ];
     hoja.appendRow(headers);
-    // Formato visual del encabezado
     const rng = hoja.getRange(1, 1, 1, headers.length);
     rng.setFontWeight('bold').setBackground('#E6F7FE').setFontColor('#007DBF');
     hoja.setFrozenRows(1);
+  } else {
+    // Migración automática: añadir columna 'llamadas' si la hoja ya existía sin ella
+    const cols = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
+    if (!cols.includes('llamadas')) {
+      const nc = hoja.getLastColumn() + 1;
+      hoja.getRange(1, nc).setValue('llamadas')
+        .setFontWeight('bold').setBackground('#E6F7FE').setFontColor('#007DBF');
+    }
   }
 
   return hoja;
