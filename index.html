@@ -1030,6 +1030,12 @@ function filtrarPeriodoAnterior() {
   });
 }
 
+// Para filas históricas sin columna 'llamadas', se deriva de cot+res (siempre iguales por el budget cap).
+function getLlamadas(r) {
+  if (r.llamadas) return +(r.llamadas);
+  return MEDIOS.reduce((s, m) => s + +(r[`cot_${m.id}`]||0) + +(r[`res_${m.id}`]||0), 0);
+}
+
 // Conversión = reservaciones sobre el total de contactos (cot+res), no sobre cotizaciones —
 // cot y res son resultados paralelos de una misma llamada, no etapas de un mismo embudo.
 function tasaConv(res, cot) {
@@ -1247,7 +1253,7 @@ function dibujarTablaAgentes(filas) {
       por[r.agente].cot += +(r[`cot_${m.id}`]||0);
       por[r.agente].res += +(r[`res_${m.id}`]||0);
     });
-    por[r.agente].llamadas += +(r.llamadas||0);
+    por[r.agente].llamadas += getLlamadas(r);
   });
   const ags = Object.keys(por).sort((a,b) => por[b].cot - por[a].cot);
   if (!ags.length) { document.getElementById('tabla-agentes').innerHTML = ''; return; }
@@ -1361,7 +1367,7 @@ function renderPanelLlamadas() {
   agentes.forEach(a => { matrix[a] = {}; fechas.forEach(f => { matrix[a][f] = 0; }); });
   filasLl.forEach(r => {
     const f = String(r.fecha).substring(0, 10);
-    if (matrix[r.agente] && f) matrix[r.agente][f] += +(r.llamadas || 0);
+    if (matrix[r.agente] && f) matrix[r.agente][f] += getLlamadas(r);
   });
 
   // ─── Totales ───────────────────────────────────────────────────────────────
