@@ -98,11 +98,12 @@ function obtenerHoja() {
     rng.setFontWeight('bold').setBackground('#E6F7FE').setFontColor('#007DBF');
     hoja.setFrozenRows(1);
   } else {
-    // Migración automática: añadir columna 'llamadas' si la hoja ya existía sin ella
-    const cols = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
-    if (!cols.includes('llamadas')) {
-      const nc = hoja.getLastColumn() + 1;
-      hoja.getRange(1, nc).setValue('llamadas')
+    // Migración automática: añadir encabezado 'llamadas' en la columna exacta (34)
+    // Los datos ya están ahí desde appendRow — solo falta el encabezado para que doGet los lea
+    const llamadasCol = 3 + MEDIOS.length * 2 + 1; // fecha + ts + agente + 15 cot + 15 res + 1 = 34
+    const headerVal   = hoja.getRange(1, llamadasCol).getValue();
+    if (headerVal !== 'llamadas') {
+      hoja.getRange(1, llamadasCol).setValue('llamadas')
         .setFontWeight('bold').setBackground('#E6F7FE').setFontColor('#007DBF');
     }
   }
