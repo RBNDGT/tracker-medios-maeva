@@ -362,16 +362,25 @@ body.dark .ag-table td{border-color:#2d2d2d}
           style="padding:13px 26px;border-radius:12px;border:none;background:var(--azul);color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s"
           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">+ Llamada</button>
       </div>
-      <!-- Barra de presupuesto de contactos -->
+      <!-- Barra de resultados por tipo -->
       <div id="budget-bar" style="margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--gris-bg);border:1px solid var(--gris-borde)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
-          <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Contactos distribuidos</span>
-          <span id="budget-label" style="font-size:14px;font-weight:800;color:var(--texto)">0 / 0</span>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Cotizaciones</span>
+            <span id="budget-cot-label" style="font-size:13px;font-weight:800;color:var(--texto)">0 / 0</span>
+          </div>
+          <div style="background:var(--gris-borde);border-radius:99px;height:6px;overflow:hidden">
+            <div id="budget-cot-fill" style="height:100%;border-radius:99px;background:var(--azul);width:0%;transition:width .3s,background .3s"></div>
+          </div>
         </div>
-        <div style="background:var(--gris-borde);border-radius:99px;height:7px;overflow:hidden">
-          <div id="budget-fill" style="height:100%;border-radius:99px;background:var(--azul);width:0%;transition:width .3s,background .3s"></div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Reservaciones</span>
+            <span id="budget-res-label" style="font-size:13px;font-weight:800;color:var(--verde-dark)">0</span>
+          </div>
+          <div style="font-size:10px;color:var(--texto-suave);margin-top:3px">Una llamada puede generar múltiples reservaciones</div>
         </div>
-        <div id="budget-msg" style="font-size:11px;color:var(--texto-suave);margin-top:7px;text-align:center;line-height:1.4">Registra primero cuántas llamadas realizaste</div>
+        <div id="budget-msg" style="font-size:11px;color:var(--texto-suave);text-align:center;line-height:1.4">Registra primero cuántas llamadas realizaste</div>
       </div>
     </div>
 
@@ -651,44 +660,51 @@ function resetConteos() {
 }
 
 
-function getTotalContactos() {
-  return MEDIOS.reduce((s, m) => s + conteos[m.id].cot + conteos[m.id].res, 0);
+function getTotalCot() {
+  return MEDIOS.reduce((s, m) => s + conteos[m.id].cot, 0);
+}
+function getTotalRes() {
+  return MEDIOS.reduce((s, m) => s + conteos[m.id].res, 0);
 }
 
 function actualizarPresupuesto() {
-  const total = getTotalContactos();
-  const cap   = llamadasHoy;
+  const cot = getTotalCot();
+  const res = getTotalRes();
+  const cap = llamadasHoy;
 
-  const label = document.getElementById('budget-label');
-  if (label) label.textContent = `${total} / ${cap}`;
+  const cotLabel = document.getElementById('budget-cot-label');
+  if (cotLabel) cotLabel.textContent = `${cot} / ${cap}`;
 
-  const fill = document.getElementById('budget-fill');
-  if (fill) {
-    const pct = cap > 0 ? Math.min(100, Math.round((total / cap) * 100)) : 0;
-    fill.style.width   = pct + '%';
-    fill.style.background = (total === cap && cap > 0) ? '#16A34A' : 'var(--azul)';
+  const cotFill = document.getElementById('budget-cot-fill');
+  if (cotFill) {
+    const pct = cap > 0 ? Math.min(100, Math.round((cot / cap) * 100)) : 0;
+    cotFill.style.width      = pct + '%';
+    cotFill.style.background = cot > cap ? '#DC2626' : 'var(--azul)';
   }
+
+  const resLabel = document.getElementById('budget-res-label');
+  if (resLabel) resLabel.textContent = res;
 
   const msg = document.getElementById('budget-msg');
   if (msg) {
     if (cap === 0) {
       msg.textContent = 'Registra primero cuántas llamadas realizaste';
       msg.style.color = 'var(--texto-suave)';
-    } else if (total === 0) {
-      msg.textContent = `Distribuye ${cap} llamada${cap !== 1 ? 's' : ''} entre cotizaciones y reservaciones`;
+    } else if (cot > cap) {
+      msg.textContent = `⚠️ Las cotizaciones (${cot}) superan las llamadas registradas (${cap})`;
+      msg.style.color = '#DC2626';
+    } else if (cot + res === 0) {
+      msg.textContent = `Registra los resultados de las ${cap} llamada${cap !== 1 ? 's' : ''}`;
       msg.style.color = 'var(--texto-suave)';
-    } else if (total < cap) {
-      msg.textContent = `Faltan ${cap - total} por distribuir`;
-      msg.style.color = '#B45309';
     } else {
-      msg.textContent = '✓ Todas las llamadas están distribuidas — listo para enviar';
+      msg.textContent = '✓ Listo para enviar';
       msg.style.color = '#16A34A';
     }
   }
 
-  // Bloquear / desbloquear botones +
-  const atCap = cap === 0 || total >= cap;
-  document.querySelectorAll('.c-btn.plus').forEach(btn => btn.classList.toggle('capped', atCap));
+  // Solo bloquear botones + de cotizaciones (res no tiene límite superior)
+  const cotCapped = cap === 0 || cot >= cap;
+  document.querySelectorAll('.c-btn.plus-cot').forEach(btn => btn.classList.toggle('capped', cotCapped));
 }
 
 function initLlamadas() {
@@ -700,9 +716,9 @@ function initLlamadas() {
 
 function ajustarLlamada(delta) {
   const newVal = Math.max(0, llamadasHoy + delta);
-  if (delta < 0 && newVal < getTotalContactos()) {
-    const tot = getTotalContactos();
-    toast(`⚠️ Ya tienes ${tot} contacto${tot !== 1 ? 's' : ''} distribuido${tot !== 1 ? 's' : ''}. Reduce primero los conteos.`);
+  if (delta < 0 && newVal < getTotalCot()) {
+    const tot = getTotalCot();
+    toast(`⚠️ Ya tienes ${tot} cotización${tot !== 1 ? 'es' : ''} registrada${tot !== 1 ? 's' : ''}. Reduce primero las cotizaciones.`);
     return;
   }
   llamadasHoy = newVal;
@@ -745,7 +761,8 @@ function renderTabla() {
 }
 
 function cambiar(id, tipo, delta) {
-  if (delta > 0 && getTotalContactos() >= llamadasHoy) return;
+  // Cotizaciones están acotadas por llamadas; reservaciones no tienen límite
+  if (delta > 0 && tipo === 'cot' && getTotalCot() >= llamadasHoy) return;
   conteos[id][tipo] = Math.max(0, conteos[id][tipo] + delta);
   const el = document.getElementById(`v-${tipo}-${id}`);
   el.textContent = conteos[id][tipo];
@@ -791,10 +808,8 @@ async function enviarRegistro() {
   const tr = MEDIOS.reduce((a,m) => a + conteos[m.id].res, 0);
 
   if (llamadasHoy === 0) { toast('⚠️ Registra cuántas llamadas realizaste antes de enviar'); return; }
-  const totalContactos = tc + tr;
-  if (totalContactos !== llamadasHoy) {
-    const faltan = llamadasHoy - totalContactos;
-    toast(`⚠️ Faltan ${faltan} llamada${faltan !== 1 ? 's' : ''} por distribuir entre cotizaciones y reservaciones`);
+  if (tc > llamadasHoy) {
+    toast(`⚠️ Las cotizaciones (${tc}) no pueden superar las llamadas registradas (${llamadasHoy})`);
     return;
   }
 
@@ -1030,7 +1045,8 @@ function filtrarPeriodoAnterior() {
   });
 }
 
-// Para filas históricas sin columna 'llamadas', se deriva de cot+res (siempre iguales por el budget cap).
+// Para filas históricas sin columna 'llamadas', cot+res es válido porque el constraint anterior lo garantizaba.
+// Para registros nuevos se usa el valor explícito guardado en el Sheet.
 function getLlamadas(r) {
   if (r.llamadas) return +(r.llamadas);
   return MEDIOS.reduce((s, m) => s + +(r[`cot_${m.id}`]||0) + +(r[`res_${m.id}`]||0), 0);
