@@ -362,23 +362,18 @@ body.dark .ag-table td{border-color:#2d2d2d}
           style="padding:13px 26px;border-radius:12px;border:none;background:var(--azul);color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s"
           onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">+ Llamada</button>
       </div>
-      <!-- Barra de resultados por tipo -->
+      <!-- Barra de llamadas con resultado -->
       <div id="budget-bar" style="margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--gris-bg);border:1px solid var(--gris-borde)">
-        <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-            <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Cotizaciones</span>
-            <span id="budget-cot-label" style="font-size:13px;font-weight:800;color:var(--texto)">0 / 0</span>
-          </div>
-          <div style="background:var(--gris-borde);border-radius:99px;height:6px;overflow:hidden">
-            <div id="budget-cot-fill" style="height:100%;border-radius:99px;background:var(--azul);width:0%;transition:width .3s,background .3s"></div>
-          </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Llamadas con resultado</span>
+          <span id="budget-cot-label" style="font-size:13px;font-weight:800;color:var(--texto)">0 / 0</span>
         </div>
-        <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:10px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.06em">Reservaciones</span>
-            <span id="budget-res-label" style="font-size:13px;font-weight:800;color:var(--verde-dark)">0</span>
-          </div>
-          <div style="font-size:10px;color:var(--texto-suave);margin-top:3px">Una llamada puede generar múltiples reservaciones</div>
+        <div style="background:var(--gris-borde);border-radius:99px;height:6px;overflow:hidden;margin-bottom:8px">
+          <div id="budget-cot-fill" style="height:100%;border-radius:99px;background:var(--azul);width:0%;transition:width .3s,background .3s"></div>
+        </div>
+        <div style="display:flex;gap:14px;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--texto-suave)">Cotizaciones: <strong id="budget-cot-n" style="color:var(--azul)">0</strong></span>
+          <span style="font-size:11px;color:var(--texto-suave)">Reservaciones: <strong id="budget-res-label" style="color:var(--verde-dark)">0</strong></span>
         </div>
         <div id="budget-msg" style="font-size:11px;color:var(--texto-suave);text-align:center;line-height:1.4">Registra primero cuántas llamadas realizaste</div>
       </div>
@@ -672,15 +667,20 @@ function actualizarPresupuesto() {
   const res = getTotalRes();
   const cap = llamadasHoy;
 
+  const conResultado = Math.min(cot + res, cap);
+
   const cotLabel = document.getElementById('budget-cot-label');
-  if (cotLabel) cotLabel.textContent = `${cot} / ${cap}`;
+  if (cotLabel) cotLabel.textContent = `${conResultado} / ${cap}`;
 
   const cotFill = document.getElementById('budget-cot-fill');
   if (cotFill) {
-    const pct = cap > 0 ? Math.min(100, Math.round((cot / cap) * 100)) : 0;
+    const pct = cap > 0 ? Math.round((conResultado / cap) * 100) : 0;
     cotFill.style.width      = pct + '%';
-    cotFill.style.background = cot > cap ? '#DC2626' : 'var(--azul)';
+    cotFill.style.background = cot > cap ? '#DC2626' : (pct === 100 ? '#16A34A' : 'var(--azul)');
   }
+
+  const cotN = document.getElementById('budget-cot-n');
+  if (cotN) cotN.textContent = cot;
 
   const resLabel = document.getElementById('budget-res-label');
   if (resLabel) resLabel.textContent = res;
