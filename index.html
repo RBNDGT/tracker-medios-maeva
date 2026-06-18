@@ -779,7 +779,7 @@ function actualizarTotales() {
   MEDIOS.forEach(m => { tc += conteos[m.id].cot; tr += conteos[m.id].res; });
   document.getElementById('tot-cot').textContent = tc;
   document.getElementById('tot-res').textContent = tr;
-  document.getElementById('tot-conv').textContent = llamadasHoy > 0 ? resXLlamada(tr, llamadasHoy).toFixed(2)+' r/ll' : '—';
+  document.getElementById('tot-conv').textContent = llamadasHoy > 0 ? Math.round(resXLlamada(tr, llamadasHoy)*100)+'%' : '—';
 }
 
 function limpiarRegistro() {
@@ -967,7 +967,7 @@ function renderDashboard() {
 
   document.getElementById('kpi-cot').textContent  = tc;
   document.getElementById('kpi-res').textContent  = tr;
-  document.getElementById('kpi-conv').textContent = tll > 0 ? resXLlamada(tr, tll).toFixed(2) : '—';
+  document.getElementById('kpi-conv').textContent = tll > 0 ? Math.round(resXLlamada(tr, tll)*100)+'%' : '—';
 
   let topId = MEDIOS[0].id, topV = 0;
   MEDIOS.forEach(m => { if (porMedio[m.id].cot > topV) { topV = porMedio[m.id].cot; topId = m.id; } });
@@ -1297,7 +1297,7 @@ function dibujarTablaAgentes(filas) {
           <td>${por[a].cot}</td>
           <td>${por[a].res}</td>
           <td>${por[a].llamadas||0}</td>
-          <td>${por[a].llamadas > 0 ? resXLlamada(por[a].res, por[a].llamadas).toFixed(2) : '—'}</td>
+          <td>${por[a].llamadas > 0 ? Math.round(resXLlamada(por[a].res, por[a].llamadas)*100)+'%' : '—'}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
