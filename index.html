@@ -453,9 +453,9 @@ body.dark .ag-table td{border-color:#2d2d2d}
         <div class="kpi-sub">en el periodo <span id="kpi-delta-res"></span></div>
       </div>
       <div class="kpi-card dorado">
-        <div class="kpi-label">Conversión</div>
+        <div class="kpi-label">Res. por llamada</div>
         <div class="kpi-val" id="kpi-conv">—</div>
-        <div class="kpi-sub">res / contactos <span id="kpi-delta-conv"></span></div>
+        <div class="kpi-sub">res / llamadas <span id="kpi-delta-conv"></span></div>
       </div>
       <div class="kpi-card gris">
         <div class="kpi-label">Canal #1 (volumen)</div>
@@ -779,7 +779,7 @@ function actualizarTotales() {
   MEDIOS.forEach(m => { tc += conteos[m.id].cot; tr += conteos[m.id].res; });
   document.getElementById('tot-cot').textContent = tc;
   document.getElementById('tot-res').textContent = tr;
-  document.getElementById('tot-conv').textContent = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100)+'%' : '—';
+  document.getElementById('tot-conv').textContent = llamadasHoy > 0 ? resXLlamada(tr, llamadasHoy).toFixed(2)+' r/ll' : '—';
 }
 
 function limpiarRegistro() {
@@ -950,11 +950,12 @@ function renderDashboard() {
   if (!filas.length) { showEstado('empty', 'Sin datos en este periodo.'); }
   else showEstado('none');
 
-  let tc = 0, tr = 0;
+  let tc = 0, tr = 0, tll = 0;
   const porMedio = {};
   MEDIOS.forEach(m => { porMedio[m.id] = {cot: 0, res: 0}; });
 
   filas.forEach(r => {
+    tll += getLlamadas(r);
     MEDIOS.forEach(m => {
       const c = +(r[`cot_${m.id}`] || 0);
       const s = +(r[`res_${m.id}`] || 0);
@@ -966,7 +967,7 @@ function renderDashboard() {
 
   document.getElementById('kpi-cot').textContent  = tc;
   document.getElementById('kpi-res').textContent  = tr;
-  document.getElementById('kpi-conv').textContent = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100)+'%' : '—';
+  document.getElementById('kpi-conv').textContent = tll > 0 ? resXLlamada(tr, tll).toFixed(2) : '—';
 
   let topId = MEDIOS[0].id, topV = 0;
   MEDIOS.forEach(m => { if (porMedio[m.id].cot > topV) { topV = porMedio[m.id].cot; topId = m.id; } });
@@ -974,7 +975,7 @@ function renderDashboard() {
   document.getElementById('kpi-top').textContent     = topM ? topM.label : '—';
   document.getElementById('kpi-top-sub').textContent = `${topV} cotizaciones`;
 
-  // ICC — Canal más eficiente (mínimo 3 contactos para evitar falsos positivos)
+  // ICC — Canal más eficiente por tasa de reservaciones vs outcomes (proxy por canal)
   let efId = null, efConv = 0;
   MEDIOS.forEach(m => {
     const totalM = porMedio[m.id].cot + porMedio[m.id].res;
@@ -985,15 +986,16 @@ function renderDashboard() {
   });
   const efM = MEDIOS.find(m => m.id === efId);
   document.getElementById('kpi-eficiente').textContent    = efM ? efM.label : '—';
-  document.getElementById('kpi-eficiente-sub').textContent = efM ? Math.round(efConv*100)+'% conversión' : 'min. 3 contactos';
+  document.getElementById('kpi-eficiente-sub').textContent = efM ? Math.round(efConv*100)+'% de outcomes' : 'min. 3 contactos';
 
   // Deltas vs periodo anterior
   const filasAnt = filtrarPeriodoAnterior();
   const { tc: tcA, tr: trA } = filasAnt.length ? calcTotales(filasAnt) : { tc: 0, tr: 0 };
+  const tllA = filasAnt.reduce((s, r) => s + getLlamadas(r), 0);
   renderDelta('kpi-delta-cot', tc, tcA);
   renderDelta('kpi-delta-res', tr, trA);
-  const convAct = (tc + tr) > 0 ? Math.round(tasaConv(tr, tc)*100) : null;
-  const convAnt = (tcA + trA) > 0 ? Math.round(tasaConv(trA, tcA)*100) : null;
+  const convAct = tll > 0 ? Math.round(resXLlamada(tr, tll) * 100) : null;
+  const convAnt = tllA > 0 ? Math.round(resXLlamada(trA, tllA) * 100) : null;
   if (convAct !== null && convAnt !== null) renderDelta('kpi-delta-conv', convAct, convAnt);
   else document.getElementById('kpi-delta-conv').innerHTML = '';
 
@@ -1052,8 +1054,13 @@ function getLlamadas(r) {
   return MEDIOS.reduce((s, m) => s + +(r[`cot_${m.id}`]||0) + +(r[`res_${m.id}`]||0), 0);
 }
 
-// Conversión = reservaciones sobre el total de contactos (cot+res), no sobre cotizaciones —
-// cot y res son resultados paralelos de una misma llamada, no etapas de un mismo embudo.
+// Eficiencia = reservaciones / llamadas recibidas. Puede superar 1.0 cuando una llamada
+// genera múltiples reservaciones. Para análisis por canal se usa res/(cot+res) como proxy
+// ya que las llamadas no se registran por canal.
+function resXLlamada(res, llamadas) {
+  return llamadas > 0 ? res / llamadas : 0;
+}
+// Para comparaciones relativas entre canales (acotado 0-1).
 function tasaConv(res, cot) {
   const total = cot + res;
   return total > 0 ? res / total : 0;
@@ -1081,7 +1088,8 @@ function renderDelta(id, actual, anterior) {
 function generarInsights(filas, porMedio, tc, tr, filasAnt) {
   const ins = [];
   if (filas.length < 2 || (tc + tr) < 5) return ins;
-  const convGral = tasaConv(tr, tc);
+  const tllGral  = filas.reduce((s, r) => s + getLlamadas(r), 0);
+  const convGral = tllGral > 0 ? resXLlamada(tr, tllGral) : tasaConv(tr, tc);
 
   // Canal más eficiente vs promedio general
   let mejorId = null, mejorConv = 0;
@@ -1281,7 +1289,7 @@ function dibujarTablaAgentes(filas) {
         <th class="th-c">Cotizaciones</th>
         <th class="th-r">Reservaciones</th>
         <th class="th-k">Llamadas</th>
-        <th class="th-k">Conversión</th>
+        <th class="th-k">Res/llamada</th>
       </tr></thead>
       <tbody>
         ${ags.map(a => `<tr>
@@ -1289,7 +1297,7 @@ function dibujarTablaAgentes(filas) {
           <td>${por[a].cot}</td>
           <td>${por[a].res}</td>
           <td>${por[a].llamadas||0}</td>
-          <td>${(por[a].cot + por[a].res) > 0 ? Math.round(tasaConv(por[a].res, por[a].cot)*100)+'%' : '—'}</td>
+          <td>${por[a].llamadas > 0 ? resXLlamada(por[a].res, por[a].llamadas).toFixed(2) : '—'}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
