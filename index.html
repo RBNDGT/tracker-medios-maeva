@@ -702,8 +702,8 @@ function actualizarPresupuesto() {
     }
   }
 
-  // Cot cap = llamadas - reservaciones (cada res usa 1 slot de llamada mínimo)
-  const cotMax = Math.max(0, cap - res);
+  // Todas las reservaciones juntas consumen 1 slot máximo (múltiples res de 1 llamada = 1 slot)
+  const cotMax = Math.max(0, cap - Math.min(res, 1));
   const cotCapped = cap === 0 || cot >= cotMax;
   document.querySelectorAll('.c-btn.plus-cot').forEach(btn => btn.classList.toggle('capped', cotCapped));
 }
@@ -762,8 +762,8 @@ function renderTabla() {
 }
 
 function cambiar(id, tipo, delta) {
-  // Cot cap: llamadas disponibles = llamadas - reservaciones (cada res usa 1 slot mínimo)
-  if (delta > 0 && tipo === 'cot' && getTotalCot() >= Math.max(0, llamadasHoy - getTotalRes())) return;
+  // Cot cap: las reservaciones (todas juntas) consumen máximo 1 slot
+  if (delta > 0 && tipo === 'cot' && getTotalCot() >= Math.max(0, llamadasHoy - Math.min(getTotalRes(), 1))) return;
   conteos[id][tipo] = Math.max(0, conteos[id][tipo] + delta);
   const el = document.getElementById(`v-${tipo}-${id}`);
   el.textContent = conteos[id][tipo];
@@ -809,12 +809,9 @@ async function enviarRegistro() {
   const tr = MEDIOS.reduce((a,m) => a + conteos[m.id].res, 0);
 
   if (llamadasHoy === 0) { toast('⚠️ Registra cuántas llamadas realizaste antes de enviar'); return; }
-  const cotMax = Math.max(0, llamadasHoy - tr);
+  const cotMax = Math.max(0, llamadasHoy - Math.min(tr, 1));
   if (tc > cotMax) {
-    const msg = tr >= llamadasHoy
-      ? `⚠️ Todas las llamadas (${llamadasHoy}) ya tienen reservaciones — no hay espacio para cotizaciones`
-      : `⚠️ Con ${tr} reservación${tr!==1?'es':''}, solo quedan ${cotMax} llamada${cotMax!==1?'s':''} para cotizaciones`;
-    toast(msg);
+    toast(`⚠️ Las cotizaciones (${tc}) superan las llamadas disponibles (${cotMax})`);
     return;
   }
 
