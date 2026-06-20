@@ -759,22 +759,23 @@ function cambiarAuto(id, tipo, delta) {
   actualizarPresupuesto();
 }
 
-// procesarEventoIndividual: aplica un evento {type, medio, canal, ts} al estado
+// procesarEventoIndividual: aplica un evento {type, medio, sinMedio, canal, ts} al estado
 function procesarEventoIndividual(ev) {
   if (!ev || !ev.medio || !ev.type) return;
   if (!conteos[ev.medio]) return; // medio desconocido
-  // Si el tipo es 'cot', también incrementar llamadasHoy (cada cotización = un contacto)
-  if (ev.type === 'cot') {
-    llamadasHoy++;
-    const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
-    localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
-    const numEl = document.getElementById('llamadas-num');
-    if (numEl) numEl.textContent = llamadasHoy;
-  }
+  // Incrementar llamadasHoy para cualquier evento del cotizador
+  // (cada cotización o reservación guardada = un contacto que ocurrió)
+  llamadasHoy++;
+  const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+  localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
+  const numEl = document.getElementById('llamadas-num');
+  if (numEl) numEl.textContent = llamadasHoy;
+  // Incrementar conteo del medio
   cambiarAuto(ev.medio, ev.type, 1);
   const label = (MEDIOS.find(m => m.id === ev.medio) || {}).label || ev.medio;
   const tipoLabel = ev.type === 'res' ? 'reservación' : 'cotización';
-  toast(`📊 +1 ${tipoLabel} · ${label} — desde Cotizador`);
+  const aviso = ev.sinMedio ? ' ⚠️ sin medio — registrado en "Otro"' : '';
+  toast(`📊 +1 ${tipoLabel} · ${label}${aviso} — Cotizador`);
 }
 
 // procesarEventosTracker: lee la cola de eventos pendientes en localStorage

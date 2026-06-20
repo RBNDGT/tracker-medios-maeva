@@ -1,4 +1,4 @@
-const CACHE = 'tracker-maeva-v6';
+const CACHE = 'tracker-maeva-v7';
 const ASSETS = [
   './',
   './index.html',
