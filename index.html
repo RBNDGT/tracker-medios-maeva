@@ -648,6 +648,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initLlamadas();
   const _logoEl = document.getElementById('topbar-logo-img');
   if (_logoEl.complete) generarFavicon(); else _logoEl.addEventListener('load', generarFavicon);
+  // ── Integración con Cotizador Maeva ──
+  procesarEventosTracker();
+  listenTrackerBC();
 });
 
 function resetConteos() {
@@ -736,6 +739,70 @@ function setFechaHoy() {
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const el = document.getElementById('fecha-display');
   if (el) el.textContent = `${parseInt(d)} · ${meses[+m-1]} · ${y}`;
+}
+
+// ─── INTEGRACIÓN CON COTIZADOR MAEVA ─────────────────────────────────────────
+// cambiarAuto: igual que cambiar() pero sin límite de cap — usado para eventos
+// automáticos del Cotizador (el agente ya validó la interacción ahí).
+function cambiarAuto(id, tipo, delta) {
+  if (!conteos[id]) return;
+  conteos[id][tipo] = Math.max(0, conteos[id][tipo] + delta);
+  const el = document.getElementById(`v-${tipo}-${id}`);
+  if (el) {
+    el.textContent = conteos[id][tipo];
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 200);
+  }
+  actualizarTotales();
+  actualizarPresupuesto();
+}
+
+// procesarEventoIndividual: aplica un evento {type, medio, canal, ts} al estado
+function procesarEventoIndividual(ev) {
+  if (!ev || !ev.medio || !ev.type) return;
+  if (!conteos[ev.medio]) return; // medio desconocido
+  // Si el tipo es 'cot', también incrementar llamadasHoy (cada cotización = un contacto)
+  if (ev.type === 'cot') {
+    llamadasHoy++;
+    const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+    localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
+    const numEl = document.getElementById('llamadas-num');
+    if (numEl) numEl.textContent = llamadasHoy;
+  }
+  cambiarAuto(ev.medio, ev.type, 1);
+  const label = (MEDIOS.find(m => m.id === ev.medio) || {}).label || ev.medio;
+  const tipoLabel = ev.type === 'res' ? 'reservación' : 'cotización';
+  toast(`📊 +1 ${tipoLabel} · ${label} — desde Cotizador`);
+}
+
+// procesarEventosTracker: lee la cola de eventos pendientes en localStorage
+// y los aplica. Se llama al abrir el tracker (maneja el caso en que estaba cerrado).
+function procesarEventosTracker() {
+  try {
+    const queue = JSON.parse(localStorage.getItem('maeva_tracker_queue') || '[]');
+    if (!queue.length) return;
+    // Solo procesar eventos de HOY (para no contaminar con días pasados)
+    const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+    const hoyMs = new Date(hoyMX).getTime();
+    const eventosDehoy = queue.filter(ev => ev.ts && ev.ts >= hoyMs);
+    if (eventosDehoy.length) {
+      eventosDehoy.forEach(ev => procesarEventoIndividual(ev));
+    }
+    localStorage.removeItem('maeva_tracker_queue');
+  } catch(e) {}
+}
+
+// listenTrackerBC: escucha BroadcastChannel 'maeva_tracker' para recibir
+// eventos en tiempo real cuando el Cotizador y el Tracker están abiertos a la vez.
+function listenTrackerBC() {
+  try {
+    const bc = new BroadcastChannel('maeva_tracker');
+    bc.onmessage = e => {
+      procesarEventoIndividual(e.data);
+    };
+  } catch(e) {}
 }
 
 // ─── TABLA ────────────────────────────────────────────────────────────────────
