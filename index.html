@@ -796,6 +796,8 @@ function procesarEventosTracker() {
 
 // listenTrackerBC: escucha BroadcastChannel 'maeva_tracker' para recibir
 // eventos en tiempo real cuando el Cotizador y el Tracker están abiertos a la vez.
+// También escucha cambios en tracker_agente vía storage event para sincronizar
+// el agente entre el Cotizador (texto libre) y el Tracker (select con lista).
 function listenTrackerBC() {
   try {
     const bc = new BroadcastChannel('maeva_tracker');
@@ -803,6 +805,19 @@ function listenTrackerBC() {
       procesarEventoIndividual(e.data);
     };
   } catch(e) {}
+  // Storage listener: el Cotizador escribe tracker_agente → el Tracker auto-selecciona
+  window.addEventListener('storage', e => {
+    if (e.key === 'tracker_agente' && e.newValue) {
+      const sel = document.getElementById('inp-agente');
+      if (!sel) return;
+      // Buscar si el nombre coincide con alguna opción del select
+      const opciones = Array.from(sel.options).map(o => o.value);
+      if (opciones.includes(e.newValue)) {
+        sel.value = e.newValue;
+        toast(`👤 Agente sincronizado: ${e.newValue}`);
+      }
+    }
+  });
 }
 
 // ─── TABLA ────────────────────────────────────────────────────────────────────
