@@ -612,6 +612,7 @@ let conteos = {};
 let rango = 'hoy';
 let datos = [];
 let llamadasHoy = 0;
+let lastResAutoTs = 0; // timestamp del último evento res automático (agrupación de llamada)
 let chartCanales = null;
 let chartTend = null;
 let chartDiaSem = null;
@@ -763,13 +764,18 @@ function cambiarAuto(id, tipo, delta) {
 function procesarEventoIndividual(ev) {
   if (!ev || !ev.medio || !ev.type) return;
   if (!conteos[ev.medio]) return; // medio desconocido
-  // Incrementar llamadasHoy para cualquier evento del cotizador
-  // (cada cotización o reservación guardada = un contacto que ocurrió)
-  llamadasHoy++;
-  const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
-  localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
-  const numEl = document.getElementById('llamadas-num');
-  if (numEl) numEl.textContent = llamadasHoy;
+  // Para res: múltiples reservaciones de la misma llamada llegan en ráfaga (< 30 s).
+  // Solo la primera cuenta como nueva llamada; las siguientes son de la misma llamada.
+  const ahora = Date.now();
+  const esMismaLlamada = ev.type === 'res' && (ahora - lastResAutoTs) < 30000;
+  if (ev.type === 'res') lastResAutoTs = ahora;
+  if (!esMismaLlamada) {
+    llamadasHoy++;
+    const hoyMX = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Mexico_City'});
+    localStorage.setItem('tracker_llamadas_' + hoyMX, String(llamadasHoy));
+    const numEl = document.getElementById('llamadas-num');
+    if (numEl) numEl.textContent = llamadasHoy;
+  }
   // Incrementar conteo del medio
   cambiarAuto(ev.medio, ev.type, 1);
   const label = (MEDIOS.find(m => m.id === ev.medio) || {}).label || ev.medio;
